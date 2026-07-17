@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>練習モード | 音楽コード勉強アプリ</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="app-nav">
+  <span class="brand">🎹 音楽コード勉強アプリ</span>
+  <a href="tutorial.html">入門</a>
+  <a href="index.html" class="active">練習</a>
+  <a href="compose.html">作曲</a>
+  <a href="learn.html">解説</a>
+  <a href="魔法陣.html">魔法陣</a>
+  <a href="compare.html">聴き比べ</a>
+</header>
+<main>
+  <h1>練習モード</h1>
+  <p class="lead">1つのコードを弾いて、テンションを足したときの響きの変化を耳と目で体感する（簡易実装版）。</p>
+
+  <section class="panel">
+    <div class="row">
+      <label class="field">ルート
+        <select id="rootSelect"></select>
+      </label>
+      <label class="field">コードタイプ
+        <select id="typeSelect"></select>
+      </label>
+      <label class="field">ボイシング
+        <select id="voicingSelect">
+          <option value="root">基本形</option>
+          <option value="first">第1転回形</option>
+          <option value="second">第2転回形</option>
+          <option value="spread">開離配置</option>
+        </select>
+      </label>
+      <label class="field">オクターブ
+        <select id="octaveSelect">
+          <option value="3">3</option>
+          <option value="4" selected>4</option>
+          <option value="5">5</option>
+        </select>
+      </label>
+    </div>
+    <div class="row">
+      <button id="playBtn" class="primary">弾く ▶</button>
+      <button id="arpBtn">1音ずつ積んで聴く</button>
+      <button id="abOrigBtn">A: 元のコード</button>
+      <button id="abTensionBtn">B: テンション追加後</button>
+    </div>
+  </section>
+
+  <h2>② テンション操作</h2>
+  <section class="panel">
+    <p class="lead" style="margin-top:0;">押した結果どんな響きになるかを一言で確認しながら、トグルで足したり外したりできる。</p>
+    <div class="row" id="tensionButtons"></div>
+  </section>
+
+  <section class="panel">
+    <div id="chordName" style="font-size:20px; font-weight:bold; margin-bottom:6px;"></div>
+    <div class="keyboard" id="keyboard"></div>
+    <div class="complexity-meter" id="complexityMeter"></div>
+  </section>
+
+  <h2>③ リアルタイム解説</h2>
+  <div class="caption-box" id="caption"></div>
+
+  <footer class="note">※本ページは企画書の優先度A機能のうち②③を中心とした簡易実装（仮実装）です。88鍵フル鍵盤・複数コード同時ハモリ表示などは今後の拡張予定。</footer>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"></script>
+<script type="module" src="js/pages/mainPage.js"></script>
+</body>
+</html>

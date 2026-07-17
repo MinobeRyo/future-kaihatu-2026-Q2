@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>解説モード | 音楽コード勉強アプリ</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="app-nav">
+  <span class="brand">🎹 音楽コード勉強アプリ</span>
+  <a href="tutorial.html">入門</a>
+  <a href="index.html">練習</a>
+  <a href="compose.html">作曲</a>
+  <a href="learn.html" class="active">解説</a>
+  <a href="魔法陣.html">魔法陣</a>
+  <a href="compare.html">聴き比べ</a>
+</header>
+<main>
+  <h1>解説モード</h1>
+  <p class="lead">単音・コードタイプ・テンション・進行を、読んで＋聴いて学ぶ辞典（簡易実装版）。</p>
+
+  <h2>コードの種類</h2>
+  <div id="chordTypeList"></div>
+
+  <h2>② テンション一覧</h2>
+  <section class="panel">
+    <table class="theory-table">
+      <thead><tr><th>種類</th><th>響きの説明</th><th></th></tr></thead>
+      <tbody id="tensionTableBody"></tbody>
+    </table>
+  </section>
+
+  <h2>① コード進行プリセット＋楽曲紐付け</h2>
+  <div id="progressionList"></div>
+
+  <footer class="note">※楽曲リストは「一般に紹介されている」レベルの参考情報で、収録前検証(verified)が済んでいないものを含みます（songs.js運用ルール参照）。音源・歌詞・楽譜は使用していません。</footer>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"></script>
+<script type="module" src="js/pages/learnPage.js"></script>
+</body>
+</html>

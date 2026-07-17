@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>作曲モード | 音楽コード勉強アプリ</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="app-nav">
+  <span class="brand">🎹 音楽コード勉強アプリ</span>
+  <a href="tutorial.html">入門</a>
+  <a href="index.html">練習</a>
+  <a href="compose.html" class="active">作曲</a>
+  <a href="learn.html">解説</a>
+  <a href="魔法陣.html">魔法陣</a>
+  <a href="compare.html">聴き比べ</a>
+</header>
+<main class="wide">
+  <h1>作曲モード</h1>
+  <p class="lead">コード・メロディ・ベースの3トラックをピアノロールに配置して作曲する。ピアノロール上にマウスを乗せると点線で追加位置がプレビューされ、クリックで確定します。長さはノート上でマウスホイールを回して変更できます。</p>
+
+  <div class="compose-layout">
+    <!-- 左: 操作パネル -->
+    <div class="compose-side">
+
+      <section class="panel">
+        <h2 style="margin-top:0;">プリセットから読み込む</h2>
+        <div class="row">
+          <label class="field">進行プリセット
+            <select id="presetSelect"></select>
+          </label>
+        </div>
+        <div class="row">
+          <label class="field">キー
+            <select id="keySelect"></select>
+          </label>
+          <button id="loadPresetBtn" class="primary">コードトラックに読み込む</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2 style="margin-top:0;">音を追加するトラック</h2>
+        <div class="track-chips">
+          <button type="button" class="track-chip t-chord on" data-track="chord">🎵 コード</button>
+          <button type="button" class="track-chip t-melody" data-track="melody">🎶 メロディ</button>
+          <button type="button" class="track-chip t-bass" data-track="bass">🎸 ベース</button>
+        </div>
+
+        <div class="field-group active" id="chordFields" style="flex-direction:column; align-items:stretch;">
+          <label class="field">タイプ<select id="typeSelect"></select></label>
+          <p class="hint" style="margin:8px 0 4px;">ルート音を鍵盤でタップ: <b id="rootLabel">C</b></p>
+          <div id="rootKeyboard"></div>
+        </div>
+        <div class="field-group" id="noteFields" style="flex-direction:column; align-items:stretch;">
+          <div class="row" style="margin:0 0 6px;">
+            <button type="button" id="noteOctDown" class="small">－オクターブ</button>
+            <span id="noteOctLabel" style="font-size:12px; color:var(--muted);"></span>
+            <button type="button" id="noteOctUp" class="small">＋オクターブ</button>
+          </div>
+          <div id="noteKeyboard"></div>
+          <p class="hint" style="margin:8px 0 0;">選択中の音: <b id="noteLabel">C4</b></p>
+        </div>
+        <div class="row" style="margin-top:10px;">
+          <label class="field">長さ
+            <select id="lenSelect">
+              <option value="0.5">0.5カウント</option>
+              <option value="1">1カウント</option>
+              <option value="2" selected>2カウント</option>
+              <option value="4">4カウント</option>
+            </select>
+          </label>
+          <button id="addBtn">末尾に追加</button>
+          <button id="clearBtn">全消去</button>
+        </div>
+        <p class="hint">👉 右のピアノロールにマウスを乗せると点線でプレビューが出ます。クリックでその位置にこのトラックの音を確定追加できます。</p>
+      </section>
+
+      <section class="panel">
+        <h2 style="margin-top:0;">再生</h2>
+        <div class="row">
+          <button id="playAllBtn" class="primary">3トラック同時再生 ▶</button>
+          <button id="stopBtn">■ 停止</button>
+        </div>
+        <div class="row" style="margin-top:10px;">
+          <label class="field">BPM <span id="bpmLabel">100</span>
+            <input type="range" id="bpmRange" min="60" max="160" value="100">
+          </label>
+        </div>
+        <div class="row" style="margin-top:10px;">
+          <label class="field">コードの音色
+            <select id="instrumentSelect">
+              <option value="acoustic_grand_piano">ピアノ</option>
+              <option value="acoustic_guitar_nylon">アコースティックギター</option>
+              <option value="electric_piano_1">エレクトリックピアノ</option>
+              <option value="string_ensemble_1">ストリングス</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2 style="margin-top:0;">逆引き検索</h2>
+        <p class="lead" style="margin-top:0;">組んだ進行が、プリセット進行（≒有名曲）とどれくらい似ているか診断する。</p>
+        <button id="matchBtn">この進行を診断する</button>
+        <div class="caption-box" id="matchResult" style="margin-top:10px;"></div>
+      </section>
+
+    </div>
+
+    <!-- 右: ピアノロール -->
+    <div class="compose-main">
+      <section class="panel">
+        <p class="lead" style="margin:0 0 8px; font-weight:bold; color:var(--text);" id="progressionLabel"></p>
+        <div id="pianoRoll"></div>
+        <div class="proll-legend">
+          <span><span class="sw" style="background:var(--major)"></span>コード（メジャー系）</span>
+          <span><span class="sw" style="background:var(--minor)"></span>コード（マイナー系）</span>
+          <span><span class="sw" style="background:var(--tension-add9)"></span>メロディ</span>
+          <span><span class="sw" style="background:var(--accent-2)"></span>ベース</span>
+        </div>
+        <div class="row" style="margin-top:10px;">
+          <span id="selInfo" style="font-size:13px; color:var(--muted);"></span>
+          <button id="deleteBtn" class="small" disabled>✕ 選択を削除</button>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <footer class="note">※クリック=選択＆試聴 / 空いている場所にマウスを乗せると点線プレビュー表示→クリックで確定追加 / ドラッグ横=タイミング移動 / ドラッグ縦=半音移調 / ノート上でホイール=長さ変更 / Deleteキー=削除。メロディはピアノ、ベースはアコースティックベースの音色で鳴ります。</footer>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"></script>
+<script type="module" src="js/pages/composePage.js"></script>
+</body>
+</html>

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>音楽の魔法陣 | 音楽コード勉強アプリ</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="app-nav">
+  <span class="brand">🎹 音楽コード勉強アプリ</span>
+  <a href="tutorial.html">入門</a>
+  <a href="index.html">練習</a>
+  <a href="compose.html">作曲</a>
+  <a href="learn.html">解説</a>
+  <a href="魔法陣.html" class="active">魔法陣</a>
+  <a href="compare.html">聴き比べ</a>
+</header>
+<main>
+  <h1>音楽の魔法陣</h1>
+  <p class="lead">外側の音名をクリックでルート選択＆試聴。円の内側をドラッグするとスケール・三角形が30°ずつ回転し、キーとコードの関係を体感できる。</p>
+
+  <div class="circle-wrap">
+    <canvas id="magicCircle" width="600" height="600"></canvas>
+  </div>
+
+  <section class="panel">
+    <div class="row">
+      <span style="font-size:13px; color:var(--muted);">表示:</span>
+      <button id="btnCircle" class="toggle on">五度圏</button>
+      <button id="btnScale" class="toggle">ダイアトニックスケール</button>
+      <button id="btnTriangle" class="toggle">コード三角形</button>
+    </div>
+    <div class="row">
+      <span style="font-size:13px; color:var(--muted);">和音:</span>
+      <button id="btnChord1" class="toggle on">単音</button>
+      <button id="btnChord3" class="toggle">三和音</button>
+      <button id="btnChord4" class="toggle">四和音</button>
+      <button id="btnChord5" class="toggle">五和音</button>
+    </div>
+    <div class="row">
+      <button id="btnPlay" class="primary">選択中のコードを再生 ▶</button>
+    </div>
+  </section>
+
+  <h2>進行再生と連動ハイライト</h2>
+  <section class="panel">
+    <div class="row">
+      <label class="field">進行プリセット
+        <select id="presetSelect"></select>
+      </label>
+      <button id="playProgBtn" class="primary">進行を再生 ▶</button>
+      <button id="stopBtn">■ 停止</button>
+      <span id="currentChord" style="color:var(--accent-2); font-weight:bold;"></span>
+    </div>
+    <p class="lead" style="margin:8px 0 0; font-size:13px;">再生中、鳴っているコードのルート音が魔法陣上で黄色くハイライトされます（コード進行＝円の上の移動）。</p>
+  </section>
+
+  <footer class="note">※旧アプリの魔法陣（クロマチック円＋回転スケールリング＋コード三角形）を移植し、再生機能を実装した版です。</footer>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"></script>
+<script type="module" src="js/pages/circlePage.js"></script>
+</body>
+</html>

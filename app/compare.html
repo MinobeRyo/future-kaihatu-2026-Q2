@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>進行聴き比べ | 音楽コード勉強アプリ</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="app-nav">
+  <span class="brand">🎹 音楽コード勉強アプリ</span>
+  <a href="tutorial.html">入門</a>
+  <a href="index.html">練習</a>
+  <a href="compose.html">作曲</a>
+  <a href="learn.html">解説</a>
+  <a href="魔法陣.html">魔法陣</a>
+  <a href="compare.html" class="active">聴き比べ</a>
+</header>
+<main>
+  <h1>進行聴き比べ（新規ページ）</h1>
+  <p class="lead">2つの進行を同じキー・BPMでループ再生し、ワンタップで切り替えて響きの違いを体感する（簡易実装版）。</p>
+
+  <section class="panel">
+    <div class="row">
+      <label class="field">進行A<select id="presetA"></select></label>
+      <label class="field">進行B<select id="presetB"></select></label>
+      <label class="field">キー<select id="keySelect"></select></label>
+      <label class="field">BPM <span id="bpmLabel">100</span>
+        <input type="range" id="bpmRange" min="60" max="160" value="100">
+      </label>
+    </div>
+    <div class="row" style="margin-top:10px;">
+      <button id="loopBtn" class="primary">ループ再生 ▶</button>
+      <button id="switchBtn">A/B 切り替え</button>
+      <button id="stopBtn">■ 停止</button>
+      <span id="activeLabel" style="color:var(--accent-2); font-weight:bold;"></span>
+    </div>
+  </section>
+
+  <div class="row" style="align-items:flex-start; gap:16px;">
+    <div class="progression-card" id="cardA" style="flex:1; min-width:280px;"></div>
+    <div class="progression-card" id="cardB" style="flex:1; min-width:280px;"></div>
+  </div>
+
+  <footer class="note">※簡易実装のため、A/B切り替えは現在のループを止めて即座に切り替える方式です（企画書の「テンポを止めずに切り替える」の完全な実装は今後の課題）。色が付いたコードブロックが2進行の違う箇所です。</footer>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"></script>
+<script type="module" src="js/pages/comparePage.js"></script>
+</body>
+</html>
