@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>進行聴き比べ | 音楽コード勉強アプリ</title>
+<script>(function(){try{document.documentElement.dataset.theme=localStorage.getItem('theme')||'light';}catch(e){}})();</script>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -15,6 +16,7 @@
   <a href="learn.html">解説</a>
   <a href="魔法陣.html">魔法陣</a>
   <a href="compare.html" class="active">聴き比べ</a>
+  <button id="themeToggle" type="button" aria-label="テーマ切り替え">🌙</button>
 </header>
 <main>
   <h1>進行聴き比べ（新規ページ）</h1>
@@ -45,6 +47,7 @@
   <footer class="note">※簡易実装のため、A/B切り替えは現在のループを止めて即座に切り替える方式です（企画書の「テンポを止めずに切り替える」の完全な実装は今後の課題）。色が付いたコードブロックが2進行の違う箇所です。</footer>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"></script>
+<script type="module" src="js/core/theme.js"></script>
 <script type="module" src="js/pages/comparePage.js"></script>
 </body>
 </html>

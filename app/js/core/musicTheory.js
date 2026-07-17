@@ -136,6 +136,41 @@ export function applyVoicing(midiArr, voicing) {
   return m.sort((a, b) => a - b);
 }
 
+// ---------- 音の役割（積み木UI用） ----------
+
+// ルートからの半音数 → 役割ラベル・キー（色分けに使う）。
+// キーはCSS変数 --role-* / --tension-* と対応させる。
+const ROLE_TABLE = [
+  { iv: 0,  key: 'root',    label: 'ルート' },
+  { iv: 2,  key: 'ninth',   label: '2nd/sus2' },
+  { iv: 3,  key: 'third',   label: '3度（短）' },
+  { iv: 4,  key: 'third',   label: '3度（長）' },
+  { iv: 5,  key: 'fourth',  label: '4度/sus4' },
+  { iv: 6,  key: 'fifth',   label: '♭5' },
+  { iv: 7,  key: 'fifth',   label: '5度' },
+  { iv: 8,  key: 'fifth',   label: '#5' },
+  { iv: 9,  key: 'sixth',   label: '6th' },
+  { iv: 10, key: 'seventh', label: '♭7th' },
+  { iv: 11, key: 'seventh', label: '7th' },
+  { iv: 14, key: 'ninth',   label: '9th' },
+  { iv: 17, key: 'eleventh', label: '11th' },
+  { iv: 21, key: 'thirteenth', label: '13th' }
+];
+
+/**
+ * ルートからの半音数(0以上、オクターブ超えも可)から音の役割を判定する。
+ * 積み木タワーUI・鍵盤ハイライトの色分けに使う（②のテンション色統一ルールの土台）。
+ * @returns {{ key: string, label: string }}
+ */
+export function noteRole(intervalFromRoot) {
+  const iv = ((intervalFromRoot % 12) + 12) % 12;
+  // 12以上（9th/11th/13th等の拡張域）は元の値で判定し、それ以外はオクターブ内で判定
+  const exact = ROLE_TABLE.find(r => r.iv === intervalFromRoot);
+  if (exact) return { key: exact.key, label: exact.label };
+  const byMod = ROLE_TABLE.find(r => r.iv === iv);
+  return byMod ? { key: byMod.key, label: byMod.label } : { key: 'other', label: '' };
+}
+
 // ---------- 度数（ディグリー）解析 ----------
 // 「進行はキーに依存しない」を体感させる度数モード、および
 // ①-2 既存楽曲との逆引きマッチングの土台。

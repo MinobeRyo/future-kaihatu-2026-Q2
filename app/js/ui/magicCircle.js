@@ -30,12 +30,15 @@ const COLORS = {
 
 const STEP = Math.PI * 2 / 12;          // 30度
 const DIATONIC = [0, 2, 4, 5, 7, 9, 11]; // メジャースケールの7音
+// Canvasの角度0は右（3時）なので、-90°ずらして「角度0＝一番上（12時）」として扱う。
+// → 初期状態でCが一番上に来る。
+const TOP_OFFSET = -Math.PI / 2;
 // スケールの主音セグメント・三角形のルート頂点は、どちらも角度0（＋回転）に置く。
 // → 常に黄色いルート音ハイライトと同じ音の上に揃う（ずれない）。
 
 export function getMagicCircleRootRadius(radius, { showDiatonicScale = false, showChordTriangle = false } = {}) {
   if (showChordTriangle) return Math.max(20, radius * 0.6 - 10);
-  if (showDiatonicScale) return radius;
+  // スケール表示時も音名と同じ0.8倍に置く（以前は外周上でリングからはみ出して見えた）
   return radius * 0.8;
 }
 
@@ -68,7 +71,7 @@ export class MagicCircle {
 
   // 回転を含めた座標変換（図形はctx.rotateで回すが、文字はこの座標で水平に描く）
   #rotatedPoint(angle, radius) {
-    const a = angle + this.rotation;
+    const a = angle + this.rotation + TOP_OFFSET;
     return {
       x: this.centerX + Math.cos(a) * radius,
       y: this.centerY + Math.sin(a) * radius
@@ -84,7 +87,8 @@ export class MagicCircle {
   }
 
   #localToScreen(x, y) {
-    const cos = Math.cos(this.rotation), sin = Math.sin(this.rotation);
+    const a = this.rotation + TOP_OFFSET;
+    const cos = Math.cos(a), sin = Math.sin(a);
     return {
       x: this.centerX + x * cos - y * sin,
       y: this.centerY + x * sin + y * cos
@@ -172,7 +176,7 @@ export class MagicCircle {
       const dist = Math.hypot(x - this.centerX, y - this.centerY);
       if (dist > this.radius * 0.6 && dist < this.radius) {
         const angle = Math.atan2(y - this.centerY, x - this.centerX);
-        const noteIndex = ((Math.round(angle / STEP) % 12) + 12) % 12;
+        const noteIndex = ((Math.round((angle - TOP_OFFSET) / STEP) % 12) + 12) % 12;
         this.#alignTo(noteIndex); // 図形も一緒に回転してずれない
         this.draw();
         this.onRootSelect?.(noteIndex);
@@ -193,10 +197,10 @@ export class MagicCircle {
       this.#highlightRoot();
     }
 
-    // 図形だけを回転させて描く
+    // 図形だけを回転させて描く（角度0＝一番上）
     ctx.save();
     ctx.translate(this.centerX, this.centerY);
-    ctx.rotate(this.rotation);
+    ctx.rotate(this.rotation + TOP_OFFSET);
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
     if (this.showDiatonicScale) this.#drawDiatonicScaleShapes();
@@ -225,7 +229,7 @@ export class MagicCircle {
 
     // 12分割の区切り線（文字の間に線が来るように +0.5）
     for (let i = 0; i < 12; i++) {
-      const angle = (i + 0.5) * STEP;
+      const angle = (i + 0.5) * STEP + TOP_OFFSET;
       ctx.beginPath();
       ctx.moveTo(
         this.centerX + Math.cos(angle) * this.radius * 0.6,
@@ -238,13 +242,13 @@ export class MagicCircle {
       ctx.stroke();
     }
 
-    // 音名（半音順・Cが右）
+    // 音名（半音順・Cが一番上）
     ctx.font = '20px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = COLORS.line;
     for (let i = 0; i < 12; i++) {
-      const angle = i * STEP;
+      const angle = i * STEP + TOP_OFFSET;
       ctx.fillText(
         NOTE_LETTERS[i],
         this.centerX + Math.cos(angle) * this.radius * 0.8,
@@ -265,7 +269,9 @@ export class MagicCircle {
     ctx.stroke();
 
     // 7音ぶんのセグメント（薄い塗り＋太線でスケール圏を強調）
-    // 主音（notePosition=0）が角度0 ＝ ルート音の位置に来る
+    // 主音（notePosition=0）が角度0 ＝ ルート音の位置に来る。
+    // 注: メジャースケールの図形は2度を対称軸にした形なので、見た目の「中心」は
+    // ルートではなく2度に来る（例: Cメジャーの図形の中心はD）。これは理論通りで正しい。
     for (const notePosition of DIATONIC) {
       const centerAngle = notePosition * STEP;
       const startAngle = centerAngle - STEP / 2;
@@ -281,7 +287,8 @@ export class MagicCircle {
       ctx.fillStyle = COLORS.scaleFill;
       ctx.fill();
       ctx.strokeStyle = COLORS.scale;
-      ctx.lineWidth = 4;
+      // ルート（主音）のセグメントだけ太枠にして、どこが1度か一目で分かるようにする
+      ctx.lineWidth = notePosition === 0 ? 6.5 : 4;
       ctx.stroke();
     }
   }
@@ -293,6 +300,17 @@ export class MagicCircle {
     this.#labelText('メジャー', major.x, major.y, COLORS.scale);
     const minor = this.#rotatedPoint(9 * STEP, this.radius * 1.12);
     this.#labelText('マイナー', minor.x, minor.y, COLORS.scale);
+
+    // 各セグメントに度数を表示（ルート・2〜7）。
+    // 「図形のどこがルートか」が見た目で分かるようにするための表示。
+    const DEGREE_LABELS = { 0: 'ルート', 2: '2', 4: '3', 5: '4', 7: '5', 9: '6', 11: '7' };
+    for (const pos of DIATONIC) {
+      const p = this.#rotatedPoint(pos * STEP, this.radius * 0.665);
+      this.#labelText(
+        DEGREE_LABELS[pos], p.x, p.y, COLORS.scale,
+        pos === 0 ? 'bold 12px Arial' : 'bold 13px Arial'
+      );
+    }
 
     // 中央のテキスト（回転させない）
     this.#labelText('スケール', this.centerX, this.centerY - 12, COLORS.scale, 'bold 20px Arial');
@@ -363,12 +381,26 @@ export class MagicCircle {
   // ルート音のハイライト（視認性を強化: 濃い黄色＋アンバーの縁取り）
   #highlightRoot() {
     const ctx = this.ctx;
-    const angle = this.currentRoot * STEP;
+    const angle = this.currentRoot * STEP + TOP_OFFSET;
+    const startAngle = angle - STEP / 2;
+    const endAngle = angle + STEP / 2;
+    const innerRadius = this.radius * 0.6;
 
-    // セグメント全体のハイライト（縁取り付き）
+    // 外側リング帯だけのハイライト。
+    // 以前は中心からの扇形だったため、リング状の青いスケールセグメントと形が合わず
+    // 「ずれている」ように見えていた → スケールと同じドーナツ形セグメントに統一。
     ctx.beginPath();
-    ctx.moveTo(this.centerX, this.centerY);
-    ctx.arc(this.centerX, this.centerY, this.radius, angle - STEP / 2, angle + STEP / 2);
+    ctx.moveTo(
+      this.centerX + Math.cos(startAngle) * innerRadius,
+      this.centerY + Math.sin(startAngle) * innerRadius);
+    ctx.lineTo(
+      this.centerX + Math.cos(startAngle) * this.radius,
+      this.centerY + Math.sin(startAngle) * this.radius);
+    ctx.arc(this.centerX, this.centerY, this.radius, startAngle, endAngle);
+    ctx.lineTo(
+      this.centerX + Math.cos(endAngle) * innerRadius,
+      this.centerY + Math.sin(endAngle) * innerRadius);
+    ctx.arc(this.centerX, this.centerY, innerRadius, endAngle, startAngle, true);
     ctx.closePath();
     ctx.fillStyle = COLORS.rootSegment;
     ctx.fill();
@@ -393,7 +425,8 @@ export class MagicCircle {
   }
 
   #drawChordName() {
-    this.#labelText(this.chordLabel, this.centerX, this.centerY - this.radius - 24, COLORS.line, 'bold 24px Arial');
+    // Cが一番上に来たため、上部中央だと「メジャー」ラベルと重なる → 左上の固定位置に表示
+    this.#labelText(this.chordLabel, 46, 32, COLORS.line, 'bold 24px Arial');
   }
 
   // --- 外部から操作するAPI ---

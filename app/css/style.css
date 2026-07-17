@@ -1,5 +1,7 @@
 /* ========================================
-   style.css - 全ページ共通スタイル（ライトテーマ版）
+   style.css - 全ページ共通スタイル
+   ダーク/ライトは :root（ライト既定）と [data-theme="dark"] の変数上書きで切替。
+   実際の切替は js/core/theme.js（＋各HTML<head>のインラインFOUC防止スクリプト）。
    ======================================== */
 
 :root {
@@ -21,6 +23,48 @@
   --tension-add9: #16a34a;
   --diff: #e14d4d;
   --radius: 10px;
+
+  /* 積み木タワーの役割別カラー（②のテンション色統一ルールの土台。鍵盤ハイライトとも共有） */
+  --role-root: #2f6fed;
+  --role-third: #22c55e;
+  --role-fifth: #f59e0b;
+  --role-seventh: #ec4899;
+  --role-sixth: var(--tension-6);
+  --role-ninth: var(--tension-9);
+  --role-eleventh: var(--tension-11);
+  --role-thirteenth: var(--tension-13);
+  --role-other: var(--muted);
+
+  --key-white-bg: #ffffff;
+  --key-black-bg: #2a2d35;
+}
+
+[data-theme="dark"] {
+  --bg: #14121a;
+  --panel: #1d1a26;
+  --panel-2: #262233;
+  --text: #ece9f5;
+  --muted: #a49dbd;
+  --border: #33304a;
+  --border-strong: #433f5e;
+  --accent: #6d8dff;
+  --accent-2: #f0a63c;
+  --major: #6d8dff;
+  --minor: #b39bff;
+  --tension-9: #35c7d9;
+  --tension-11: #b39bff;
+  --tension-13: #f0a63c;
+  --tension-6: #f0cd6e;
+  --tension-add9: #4ade80;
+  --diff: #ff7a7a;
+
+  --role-root: #6d8dff;
+  --role-third: #4ade80;
+  --role-fifth: #f0a63c;
+  --role-seventh: #f472b6;
+
+  --key-white-bg: #2b2739;
+  --key-black-bg: #0c0a12;
 }
 
 * { box-sizing: border-box; }
@@ -31,6 +75,7 @@ body {
   background: var(--bg);
   color: var(--text);
   line-height: 1.6;
+  transition: background .15s, color .15s;
 }
 
 header.app-nav {
@@ -59,6 +104,22 @@ header.app-nav a {
 
 header.app-nav a:hover { background: var(--panel-2); color: var(--text); }
 header.app-nav a.active { background: var(--accent); color: #ffffff; font-weight: bold; }
+
+#themeToggle {
+  margin-left: auto;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  font-size: 16px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#themeToggle:hover { border-color: var(--accent); color: inherit; }
 
 main {
   max-width: 980px;
@@ -114,7 +175,7 @@ select, button, input[type=range] {
 }
 
 select {
-  background: #ffffff;
+  background: var(--panel);
   color: var(--text);
   border: 1px solid var(--border-strong);
   border-radius: 8px;
@@ -122,7 +183,7 @@ select {
 }
 
 button {
-  background: #ffffff;
+  background: var(--panel);
   color: var(--text);
   border: 1px solid var(--border-strong);
   border-radius: 8px;
@@ -195,20 +256,22 @@ button.toggle.on { background: var(--accent-2); color: #ffffff; border-color: va
 .key.white {
   width: 40px;
   height: 140px;
-  background: #ffffff;
+  background: var(--key-white-bg);
   border: 1px solid #8a93a5;
   z-index: 1;
 }
 .key.black {
   width: 26px;
   height: 88px;
-  background: #2a2d35;
+  background: var(--key-black-bg);
   border: 1px solid #14161c;
   z-index: 2;
 }
 .key.chord-tone.white { background: var(--major); }
 .key.chord-tone.black { background: var(--major); }
-.key.tension-tone { background: var(--tension-9) !important; }
+/* テンション色は役割ごとに変わるため、固定色ではなく inline style（--role-*）で個別に塗る。
+   inline styleが無い場合の保険としてのみ 9th色を既定にする。 */
+.key.tension-tone { background: var(--tension-9); }
 
 /* --- タイムライン（作曲モード簡易ピアノロール） --- */
 .timeline {
@@ -420,4 +483,821 @@ footer.note { color: var(--muted); font-size: 12px; margin-top: 40px; }
   border: 1.5px solid var(--diff);
   background: rgba(225,77,77,.10);
   pointer-events: none;
+}
+
+/* ========================================
+   練習モード: 左右2分割レイアウト
+   ======================================== */
+.practice-layout {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+.practice-side {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.practice-side .panel { margin-bottom: 0; }
+.practice-main { min-width: 0; }
+@media (max-width: 1000px) {
+  .practice-layout { grid-template-columns: 1fr; }
+}
+
+/* ========================================
+   積み木タワー（練習モード・右プレビュー）
+   常にダークな「ステージ」として表示する（仮デザインをそのまま実装）。
+   ページ全体のライト/ダーク切替とは独立した固定配色。
+   ======================================== */
+.tower-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 32px 20px 26px;
+  border-radius: 22px;
+  background: radial-gradient(120% 90% at 50% 0%, #241f30 0%, #14111c 60%, #0e0b12 100%);
+  box-shadow: 0 20px 44px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.04);
+}
+.tower-chordname {
+  font-size: 26px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: .02em;
+  text-shadow: 0 2px 12px rgba(0,0,0,.4);
+}
+.tower-empty {
+  color: rgba(255,255,255,.5);
+  font-size: 14px;
+  padding: 30px 0;
+}
+.tower-blocks {
+  display: flex;
+  flex-direction: column-reverse; /* 低い音を下、高い音を上に積む */
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  width: 100%;
+}
+.tower-block {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 240px;
+  padding: 13px 20px;
+  border-radius: 16px;
+  color: #ffffff;
+  font-weight: bold;
+  font-size: 14px;
+  cursor: pointer;
+  border: none;
+  background-blend-mode: normal;
+  box-shadow: 0 12px 26px rgba(0,0,0,.45), inset 0 2px 0 rgba(255,255,255,.32), inset 0 -6px 12px rgba(0,0,0,.22);
+  animation: towerDrop .38s cubic-bezier(.2,.9,.3,1.25) both;
+  transition: transform .12s;
+}
+.tower-block:hover { transform: translateY(-2px); }
+.tower-block .role { font-size: 11px; font-weight: normal; opacity: .85; }
+@keyframes towerDrop {
+  from { transform: translateY(-18px) scale(.96); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+.tower-meter {
+  display: flex;
+  gap: 5px;
+  width: 240px;
+}
+.tower-meter .seg {
+  flex: 1;
+  height: 9px;
+  border-radius: 5px;
+  background: rgba(255,255,255,.10);
+  transition: background .2s, box-shadow .2s;
+}
+.tower-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  max-width: 340px;
+}
+.tower-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 13px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffffff;
+  border: 1px solid rgba(255,255,255,.25);
+  cursor: pointer;
+  transition: .15s;
+}
+.tower-chip:hover { filter: brightness(1.25); }
+.tower-feel {
+  font-size: 13px;
+  color: rgba(255,255,255,.7);
+  text-align: center;
+}
+/* ステージ内の鍵盤はページのテーマに関わらず常にダーク配色 */
+.tower-stage .keyboard { margin-top: 6px; }
+.tower-stage .key.white { background: #2b2739; border-color: rgba(255,255,255,.15); color: rgba(255,255,255,.55); }
+.tower-stage .key.black { background: #0c0a12; border-color: rgba(0,0,0,.6); }
+.tower-stage .key.chord-tone { box-shadow: 0 0 16px currentColor; }
+
+/* ========================================
+   入門ページ・ステップ通しUI
+   ======================================== */
+.step-flow {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow-x: auto;
+  margin-bottom: 18px;
+  background: var(--panel);
+}
+.step-flow-item {
+  flex: 1 0 auto;
+  min-width: 64px;
+  padding: 10px 6px;
+  text-align: center;
+  border: none;
+  border-right: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1.3;
+}
+.step-flow-item:last-child { border-right: none; }
+.step-flow-item .n {
+  display: block;
+  font-size: 13px;
+  font-weight: bold;
+  margin-bottom: 2px;
+}
+.step-flow-item.done { color: color-mix(in srgb, var(--accent) 60%, var(--muted)); }
+.step-flow-item.active { color: var(--accent); background: var(--panel-2); font-weight: bold; }
+
+.step-progress {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+  margin-bottom: 18px;
+  overflow: hidden;
+}
+.step-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width .2s;
+}
+
+.step-panel { display: none; }
+.step-panel.active { display: block; }
+
+.step-detail {
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 12px;
+  background: var(--panel-2);
+}
+.step-detail summary {
+  cursor: pointer;
+  padding: 8px 0;
+  font-weight: bold;
+  color: var(--accent);
+  font-size: 13px;
+}
+.step-detail[open] summary { margin-bottom: 4px; }
+.step-detail p { font-size: 13px; color: var(--text); }
+
+.step-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 18px;
+}
+.step-nav button.primary:disabled,
+.step-nav button:disabled {
+  opacity: .4;
+  cursor: default;
+}
+
+/* ================================================================
+   v2 デザイン（仮デザイン「コード入門」「音の積み木」の統一スタイル）
+   body.v2 が付いたページ（入門・練習）にだけ適用され、他ページは不変。
+   ライト: 温かいクリーム＋テラコッタ / ダーク: 焦げ茶ベース。
+   フォント: Zen Maru Gothic（本文）+ Outfit（数字・ラベル）。
+   ================================================================ */
+body.v2 {
+  /* --- デモ由来のデザイントークン --- */
+  --bg: oklch(0.985 0.008 70); --bg-2: oklch(0.965 0.011 66);
+  --surface: oklch(0.999 0.004 80); --surface-2: oklch(0.965 0.011 66);
+  --text: oklch(0.28 0.013 55); --muted: oklch(0.55 0.013 60);
+  --border: oklch(0.9 0.013 66); --border-strong: oklch(0.84 0.02 60);
+  --accent: oklch(0.66 0.15 32); --accent-2: oklch(0.73 0.13 52);
+  --accent-ink: oklch(0.99 0.01 40);
+  --accent-soft: oklch(0.945 0.045 40); --accent-line: oklch(0.86 0.07 40);
+  --shadow: 0 18px 44px rgba(72,46,36,.13); --shadow-sm: 0 6px 16px rgba(72,46,36,.10);
+  --key-white: oklch(0.999 0.004 80); --key-black: oklch(0.34 0.013 50);
+  --font-alt: "Outfit", sans-serif;
+
+  /* --- 既存コンポーネント用の変数を新パレットへ張り替え --- */
+  --panel: var(--surface);
+  --panel-2: var(--surface-2);
+  --key-white-bg: var(--key-white);
+  --key-black-bg: var(--key-black);
+  --radius: 16px;
+
+  /* --- 積み木の役割色（ダークステージ向けに鮮やかなoklchへ更新） --- */
+  --role-root: oklch(0.68 0.15 40);
+  --role-third: oklch(0.72 0.15 150);
+  --role-fifth: oklch(0.76 0.13 85);
+  --role-seventh: oklch(0.7 0.15 350);
+  --role-sixth: oklch(0.78 0.12 100);
+  --role-ninth: oklch(0.7 0.12 195);
+  --role-eleventh: oklch(0.66 0.16 300);
+  --role-thirteenth: oklch(0.75 0.14 60);
+  --role-other: var(--muted);
+
+  font-family: "Zen Maru Gothic", "Hiragino Kaku Gothic ProN", system-ui, sans-serif;
+  background:
+    radial-gradient(1200px 600px at 78% -8%, var(--accent-soft), transparent 60%),
+    var(--bg);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+  transition: background .35s, color .35s;
+}
+
+[data-theme="dark"] body.v2 {
+  --bg: oklch(0.215 0.013 50); --bg-2: oklch(0.25 0.014 50);
+  --surface: oklch(0.275 0.015 52); --surface-2: oklch(0.315 0.015 52);
+  --text: oklch(0.95 0.006 80); --muted: oklch(0.73 0.013 70);
+  --border: oklch(0.37 0.015 52); --border-strong: oklch(0.44 0.018 52);
+  --accent: oklch(0.73 0.15 34); --accent-2: oklch(0.78 0.13 52);
+  --accent-ink: oklch(0.2 0.02 40);
+  --accent-soft: oklch(0.35 0.06 35); --accent-line: oklch(0.45 0.08 38);
+  --shadow: 0 18px 48px rgba(0,0,0,.44); --shadow-sm: 0 6px 18px rgba(0,0,0,.4);
+  --key-white: oklch(0.88 0.008 75); --key-black: oklch(0.16 0.013 52);
+}
+
+/* --- v2 アニメーション --- */
+@keyframes v2CardIn { from { opacity: 0; transform: translateY(16px) scale(.99); } to { opacity: 1; transform: none; } }
+@keyframes v2CapIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes v2PopIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@keyframes v2BlockDrop {
+  0% { opacity: 0; transform: translateY(-46px) scale(.92); }
+  55% { transform: translateY(7px) scale(1.02); }
+  78% { transform: translateY(-3px); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes v2RingOut {
+  from { transform: translate(-50%,-50%) scale(.4); opacity: .5; }
+  to { transform: translate(-50%,-50%) scale(2.7); opacity: 0; }
+}
+@keyframes v2NameIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes v2Floaty { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+
+/* --- ナビゲーションバー --- */
+body.v2 header.app-nav {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  background: color-mix(in oklch, var(--bg) 78%, transparent);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 22px;
+  gap: 6px;
+}
+body.v2 header.app-nav .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 15px;
+  color: var(--text);
+}
+body.v2 header.app-nav .brand::before {
+  content: '';
+  width: 11px; height: 11px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  flex: 0 0 auto;
+}
+body.v2 header.app-nav a {
+  border-radius: 999px;
+  padding: 7px 13px;
+  font-weight: 700;
+  transition: .18s;
+}
+body.v2 header.app-nav a:hover { background: var(--accent-soft); color: var(--accent); }
+body.v2 header.app-nav a.active {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: var(--accent-ink);
+  box-shadow: 0 4px 12px color-mix(in oklch, var(--accent) 32%, transparent);
+}
+body.v2 #themeToggle {
+  width: 38px; height: 38px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: .18s;
+}
+body.v2 #themeToggle:hover { border-color: var(--accent); transform: translateY(-1px); }
+
+/* --- 見出し・リード --- */
+body.v2 h1 {
+  font-size: 27px;
+  line-height: 1.35;
+  font-weight: 700;
+  margin: 8px 0 8px;
+  text-wrap: pretty;
+}
+body.v2 p.lead { font-size: 15.5px; line-height: 1.75; text-wrap: pretty; }
+body.v2 h2 { color: var(--text); font-weight: 700; }
+
+/* --- カード（panel） --- */
+body.v2 .panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  box-shadow: var(--shadow-sm);
+  padding: 22px;
+  transition: background .35s;
+}
+
+/* --- ボタン・セレクト --- */
+body.v2 button {
+  border-radius: 14px;
+  border: 1.5px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-family: inherit;
+  font-weight: 700;
+  padding: 10px 16px;
+  transition: .16s;
+}
+body.v2 button:hover {
+  border-color: var(--accent-line);
+  color: var(--accent);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+body.v2 button:active { transform: translateY(0); }
+body.v2 button.primary {
+  border: none;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: var(--accent-ink);
+  box-shadow: 0 8px 20px color-mix(in oklch, var(--accent) 34%, transparent);
+}
+body.v2 button.primary:hover { color: var(--accent-ink); opacity: 1; filter: brightness(1.05); }
+body.v2 button.toggle.on {
+  border: none;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: var(--accent-ink);
+  box-shadow: 0 6px 16px color-mix(in oklch, var(--accent) 30%, transparent);
+}
+body.v2 select {
+  border-radius: 12px;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  padding: 8px 10px;
+  font-family: inherit;
+  font-weight: 700;
+}
+body.v2 label.field { font-weight: 700; gap: 5px; }
+
+/* --- キャプションボックス --- */
+body.v2 .caption-box {
+  background: linear-gradient(180deg, var(--accent-soft), color-mix(in oklch, var(--accent-soft) 55%, var(--surface)));
+  border: 1px solid var(--accent-line);
+  border-left: 1px solid var(--accent-line);
+  border-radius: 16px;
+  padding: 15px 17px;
+  font-size: 14.5px;
+  line-height: 1.7;
+  animation: v2CapIn .35s ease both;
+}
+body.v2 .caption-box .more { color: var(--accent); font-weight: 700; }
+
+/* --- 鍵盤 --- */
+body.v2 .key { transition: filter .1s, background .15s, box-shadow .15s; }
+body.v2 .key.white {
+  background: var(--key-white);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 7px 7px;
+}
+body.v2 .key.black {
+  background: var(--key-black);
+  border: 1px solid rgba(0,0,0,.5);
+  border-radius: 0 0 5px 5px;
+}
+body.v2 .key.white:hover { filter: brightness(.97); }
+body.v2 .key.black:hover { filter: brightness(1.2); }
+body.v2 .key.chord-tone.white { background: color-mix(in oklch, var(--text) 15%, var(--key-white)); }
+body.v2 .key.chord-tone.black { background: color-mix(in oklch, var(--accent) 40%, var(--key-black)); }
+body.v2 .key.tension-tone { background: var(--accent); box-shadow: 0 0 18px color-mix(in oklch, var(--accent) 55%, transparent); }
+
+/* --- 入門: ステップフローバー（矢羽根セグメント） --- */
+body.v2 .step-flow {
+  display: flex;
+  align-items: stretch;
+  height: 52px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm);
+  overflow-x: auto;
+  overflow-y: hidden;
+  margin-bottom: 14px;
+}
+body.v2 .step-flow-item {
+  position: relative;
+  flex: 1 0 56px;
+  min-width: 56px;
+  padding: 0 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  overflow: visible;
+  z-index: 1;
+}
+body.v2 .step-flow-item + .step-flow-item { border-left: 1px solid var(--border); }
+body.v2 .step-flow-item:hover { transform: none; box-shadow: none; color: var(--accent); }
+body.v2 .step-flow-item .n { font-size: 16px; margin-bottom: 0; }
+body.v2 .step-flow-item.done { color: color-mix(in oklch, var(--accent) 55%, var(--muted)); }
+body.v2 .step-flow-item.active { color: var(--accent); background: transparent; z-index: 3; }
+body.v2 .step-flow-item.active::before,
+body.v2 .step-flow-item.active::after {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0;
+  left: -7px;
+  width: calc(100% + 14px);
+  background: var(--accent);
+  clip-path: polygon(0% 0%, calc(100% - 13px) 0%, 100% 50%, calc(100% - 13px) 100%, 0% 100%, 13px 50%);
+  z-index: -2;
+}
+body.v2 .step-flow-item.active::after {
+  top: 2px; bottom: 2px;
+  left: -5px;
+  width: calc(100% + 10px);
+  background: linear-gradient(180deg, var(--surface), var(--accent-soft));
+  clip-path: polygon(0% 0%, calc(100% - 12px) 0%, 100% 50%, calc(100% - 12px) 100%, 0% 100%, 12px 50%);
+  z-index: -1;
+}
+body.v2 .step-flow-item:first-child.active::before,
+body.v2 .step-flow-item:first-child.active::after { clip-path: polygon(0% 0%, calc(100% - 13px) 0%, 100% 50%, calc(100% - 13px) 100%, 0% 100%); border-radius: 13px 0 0 13px; }
+body.v2 .step-flow-item:last-child.active::before,
+body.v2 .step-flow-item:last-child.active::after { clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 13px 50%); border-radius: 0 13px 13px 0; }
+
+body.v2 .step-progress {
+  height: 5px;
+  border-radius: 3px;
+  background: var(--surface-2);
+  border: none;
+  margin-bottom: 22px;
+}
+body.v2 .step-progress-fill {
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  border-radius: 3px;
+}
+
+/* --- 入門: ステップパネル --- */
+body.v2 .step-panel.active { animation: v2CardIn .42s cubic-bezier(.2,.7,.2,1) both; }
+body.v2 .step-panel h2 {
+  font-size: 24px;
+  line-height: 1.4;
+  margin: 4px 0 14px;
+  color: var(--text);
+  text-wrap: pretty;
+}
+body.v2 .step-panel .panel { box-shadow: var(--shadow); }
+body.v2 .step-panel .panel > p { color: var(--muted); font-size: 15px; line-height: 1.8; margin-top: 0; text-wrap: pretty; }
+
+body.v2 .step-detail {
+  margin-top: 16px;
+  border: none;
+  border-top: 1px dashed var(--border);
+  border-radius: 0;
+  background: transparent;
+  padding: 12px 2px 2px;
+}
+body.v2 .step-detail summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  list-style: none;
+  color: var(--text);
+  font-size: 14.5px;
+}
+body.v2 .step-detail summary::-webkit-details-marker { display: none; }
+body.v2 .step-detail summary::after {
+  content: '▼';
+  display: grid;
+  place-items: center;
+  width: 28px; height: 28px;
+  border-radius: 9px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 12px;
+  transition: transform .25s;
+  flex: 0 0 auto;
+}
+body.v2 .step-detail[open] summary::after { transform: rotate(180deg); }
+body.v2 .step-detail[open] p {
+  animation: v2PopIn .28s ease both;
+  background: var(--surface-2);
+  border-radius: 14px;
+  padding: 16px 18px;
+  font-size: 13.5px;
+  line-height: 1.85;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+
+body.v2 .step-nav { margin-top: 22px; }
+body.v2 .step-nav button { padding: 12px 18px; font-size: 14px; }
+body.v2 .step-nav button.primary:disabled,
+body.v2 .step-nav button:disabled {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  color: var(--muted);
+  box-shadow: none;
+  transform: none;
+}
+body.v2 footer.note { line-height: 1.8; }
+
+/* --- 練習: 2分割レイアウト --- */
+body.v2 .practice-layout {
+  grid-template-columns: minmax(340px, 410px) 1fr;
+  gap: 22px;
+}
+body.v2 .practice-side { gap: 16px; }
+
+/* --- 練習: 音の積み木ステージ（仮デザイン「音の積み木」を移植） --- */
+body.v2 .tower-stage {
+  --stage-glow: var(--role-root);
+  position: relative;
+  overflow: hidden;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+  border-radius: 26px;
+  border: 1px solid rgba(255,255,255,.06);
+  background:
+    radial-gradient(60% 46% at 50% 40%, color-mix(in oklch, var(--stage-glow) 20%, transparent), transparent 70%),
+    radial-gradient(140% 100% at 50% -10%, #1c1526, #0c0a10 62%);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.05);
+  min-height: calc(100vh - 250px);
+  transition: background .5s;
+}
+/* 再生時のリング波紋 */
+body.v2 .tower-stage.pulse::before,
+body.v2 .tower-stage.pulse::after {
+  content: '';
+  position: absolute;
+  left: 50%; top: 46%;
+  width: 240px; height: 240px;
+  border-radius: 50%;
+  border: 2px solid var(--stage-glow);
+  pointer-events: none;
+  z-index: 0;
+  animation: v2RingOut 1.1s ease-out forwards;
+}
+body.v2 .tower-stage.pulse::after { animation: v2RingOut 1.4s .12s ease-out forwards; opacity: .6; }
+
+body.v2 .stage-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 20px 28px 0;
+}
+body.v2 .stage-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  font-weight: 700;
+  font-size: 16px;
+  color: #fff;
+  letter-spacing: .02em;
+}
+body.v2 .stage-brand .dot {
+  width: 13px; height: 13px;
+  border-radius: 4px;
+  background: linear-gradient(135deg, oklch(0.7 0.16 40), oklch(0.66 0.16 300));
+  box-shadow: 0 0 16px oklch(0.68 0.16 340 / .6);
+}
+body.v2 .stage-tagline { font-size: 12.5px; color: rgba(255,255,255,.5); }
+
+body.v2 .stage-nowplaying { padding: 18px 28px 6px; }
+body.v2 .stage-label {
+  font-family: var(--font-alt);
+  font-size: 11px;
+  letter-spacing: .2em;
+  color: rgba(255,255,255,.4);
+}
+body.v2 .stage-label.inset { padding: 14px 28px 0; }
+body.v2 .tower-chordname {
+  margin-top: 6px;
+  font-family: var(--font-alt);
+  font-size: 42px;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: .01em;
+  color: var(--stage-glow);
+  text-shadow: 0 0 30px color-mix(in oklch, var(--stage-glow) 55%, transparent);
+  animation: v2NameIn .4s ease both;
+}
+body.v2 .tower-feel { margin-top: 8px; font-size: 14.5px; color: rgba(255,255,255,.82); text-align: left; }
+
+body.v2 .tower-blocks {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  justify-content: center;
+  padding: 22px 20px 30px;
+  gap: 9px;
+  min-height: 220px;
+}
+/* 床の影 */
+body.v2 .tower-blocks::before {
+  content: '';
+  order: -1; /* column-reverseで最下部に来る */
+  width: 230px;
+  height: 20px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(0,0,0,.55), transparent);
+  filter: blur(3px);
+}
+body.v2 .tower-empty {
+  width: 250px;
+  height: 66px;
+  margin: 0 auto;
+  border-radius: 18px;
+  border: 2px dashed rgba(255,255,255,.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255,255,255,.4);
+  font-size: 14px;
+  padding: 0;
+  animation: v2Floaty 3s ease-in-out infinite;
+}
+body.v2 .tower-block {
+  height: 58px;
+  padding: 0 22px;
+  border: none;
+  border-radius: 17px;
+  color: #fff;
+  font-size: 16px;
+  box-shadow: 0 12px 26px rgba(0,0,0,.45), inset 0 2px 0 rgba(255,255,255,.35), inset 0 -7px 14px rgba(0,0,0,.28);
+  /* コードを変えたときだけ、下の音から順に1個ずつ落ちる（--iはJSが設定） */
+  animation: v2BlockDrop .5s cubic-bezier(.2,.9,.3,1.25) calc(var(--i, 0) * 110ms) backwards;
+}
+body.v2 .tower-block:hover { transform: translateY(-2px) scale(1.01); color: #fff; }
+
+/* ブロックの中身（強調発光は外側の落下と分離してこの層で動かす） */
+body.v2 .blk-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+}
+/* 音が鳴った瞬間の強調表示: その段だけ明るく光る */
+body.v2 .blk-inner.hit {
+  animation: v2BlockHit .45s ease both;
+}
+@keyframes v2BlockHit {
+  0% { filter: brightness(1); }
+  30% { filter: brightness(1.55) drop-shadow(0 0 14px rgba(255,255,255,.55)); }
+  100% { filter: brightness(1); }
+}
+/* 「1音ずつ積んで聴く」用: 音が鳴るまで待機 → 鳴った瞬間に落ちてくる */
+body.v2 .tower-block.pending { opacity: 0; animation: none; }
+body.v2 .tower-block.drop-now { animation: v2BlockDrop .45s cubic-bezier(.2,.9,.3,1.25) both; }
+
+/* ＋音をつむ / −ひとつ外す（仮デザイン「音の積み木」のコントロール） */
+body.v2 .stage-controls {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  gap: 10px;
+  padding: 0 28px 16px;
+}
+body.v2 .stage-controls button { font-size: 15px; font-weight: 700; }
+body.v2 .stage-controls .stack-add {
+  flex: 1.4;
+  padding: 14px;
+  border: none;
+  border-radius: 15px;
+  color: #fff;
+  background: linear-gradient(135deg, oklch(0.72 0.16 44), oklch(0.66 0.16 20));
+  box-shadow: 0 10px 26px oklch(0.66 0.16 35 / .45);
+}
+body.v2 .stage-controls .stack-add:hover { color: #fff; filter: brightness(1.08); }
+body.v2 .stage-controls .stack-remove {
+  flex: 1;
+  padding: 14px;
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 15px;
+  background: rgba(255,255,255,.06);
+  color: #fff;
+}
+body.v2 .stage-controls .stack-remove:hover { background: rgba(255,255,255,.12); color: #fff; border-color: rgba(255,255,255,.3); }
+body.v2 .stage-controls button.off {
+  opacity: .35;
+  pointer-events: none;
+  box-shadow: none;
+}
+body.v2 .tower-block .role {
+  font-family: var(--font-alt);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  color: rgba(255,255,255,.82);
+}
+
+body.v2 .tower-meter-wrap { padding: 0 28px; }
+body.v2 .meter-caption {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: rgba(255,255,255,.5);
+  margin-bottom: 9px;
+}
+body.v2 .tower-meter { width: 100%; gap: 6px; }
+body.v2 .tower-meter .seg { height: 10px; border-radius: 5px; transition: .3s; }
+
+body.v2 .tower-chips {
+  justify-content: flex-start;
+  max-width: none;
+  padding: 10px 28px 18px;
+  gap: 8px;
+  min-height: 38px;
+}
+body.v2 .tower-chip {
+  font-size: 13px;
+  padding: 7px 13px;
+  border-width: 1px;
+  border-radius: 999px;
+  color: #fff;
+  animation: v2PopIn .3s ease calc(var(--i, 0) * 50ms) backwards;
+}
+body.v2 .tower-chip:hover { color: #fff; filter: brightness(1.25); box-shadow: none; }
+
+body.v2 .stage-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 28px 18px;
+  border-top: 1px solid rgba(255,255,255,.08);
+  font-size: 12px;
+  color: rgba(255,255,255,.7);
+}
+body.v2 .stage-legend .ttl {
+  font-family: var(--font-alt);
+  font-size: 11px;
+  letter-spacing: .1em;
+  color: rgba(255,255,255,.4);
+  width: 100%;
+}
+body.v2 .stage-legend .it { display: inline-flex; align-items: center; gap: 6px; }
+body.v2 .stage-legend .sw { width: 12px; height: 12px; border-radius: 4px; display: inline-block; }
+
+body.v2 .stage-piano {
+  padding: 14px 20px 18px;
+  background: rgba(0,0,0,.25);
+  border-top: 1px solid rgba(255,255,255,.06);
+}
+body.v2 .stage-piano .keyboard { margin: 0; }
+body.v2 .stage-piano .keyboard-inner { height: 100px; margin: 0 auto; }
+body.v2 .stage-piano .key.white { height: 100px; background: #f3eef2; border-color: #cbb; color: rgba(0,0,0,.4); }
+body.v2 .stage-piano .key.black { height: 62px; background: #1a1620; border-color: #000; }
+body.v2 .stage-piano .key.chord-tone { box-shadow: 0 0 22px currentColor; }
+
+@media (max-width: 1000px) {
+  body.v2 .practice-layout { grid-template-columns: 1fr; }
+  body.v2 .tower-stage { min-height: 0; }
 }

@@ -159,3 +159,56 @@ demo('aBassBtn', () => {
   kb6.highlight([57, ...FOUR_NOTES], new Set([57])); // A3をベースに
   seq([{ midi: [57], at: 0, dur: 1.8 }, { midi: FOUR_NOTES, at: 200, dur: 1.6 }]);
 });
+
+// ========================================
+// ステップ通しUI: 1画面1ステップ表示＋上部フローバー（クリックで直接ジャンプ＝スキップ操作を兼ねる）
+// ========================================
+const STEPS = [
+  { icon: '🎵', title: '半音' },
+  { icon: '📏', title: '3度' },
+  { icon: '🎹', title: '三和音' },
+  { icon: '🔁', title: '形' },
+  { icon: '🧱', title: 'セブンス' },
+  { icon: '🔗', title: '名前' },
+  { icon: '🏁', title: 'GOAL' }
+];
+
+const panels = Array.from(document.querySelectorAll('.step-panel'));
+const stepFlow = document.getElementById('stepFlow');
+const progressFill = document.getElementById('stepProgressFill');
+const prevBtn = document.getElementById('stepPrevBtn');
+const nextBtn = document.getElementById('stepNextBtn');
+const counterEl = document.getElementById('stepCounter');
+
+let current = 0;
+
+STEPS.forEach((s, i) => {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'step-flow-item';
+  btn.innerHTML = `<span class="n">${s.icon}</span>${s.title}`;
+  btn.addEventListener('click', () => goTo(i));
+  stepFlow.appendChild(btn);
+});
+const flowItems = Array.from(stepFlow.children);
+
+function goTo(i) {
+  current = Math.max(0, Math.min(panels.length - 1, i));
+  panels.forEach((p, idx) => p.classList.toggle('active', idx === current));
+  flowItems.forEach((el, idx) => {
+    el.classList.toggle('active', idx === current);
+    el.classList.toggle('done', idx < current);
+  });
+  progressFill.style.width = `${Math.round((current / (panels.length - 1)) * 100)}%`;
+  prevBtn.disabled = current === 0;
+  const isLast = current === panels.length - 1;
+  nextBtn.disabled = isLast;
+  nextBtn.textContent = current === panels.length - 2 ? 'できた！ →' : 'つぎへ →';
+  counterEl.textContent = isLast ? 'GOAL' : `STEP ${current + 1} / ${panels.length - 1}`;
+  if (window.scrollY > 0) window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+prevBtn.addEventListener('click', () => goTo(current - 1));
+nextBtn.addEventListener('click', () => goTo(current + 1));
+
+goTo(0);

@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>作曲モード | 音楽コード勉強アプリ</title>
+<script>(function(){try{document.documentElement.dataset.theme=localStorage.getItem('theme')||'light';}catch(e){}})();</script>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -15,6 +16,7 @@
   <a href="learn.html">解説</a>
   <a href="魔法陣.html">魔法陣</a>
   <a href="compare.html">聴き比べ</a>
+  <button id="themeToggle" type="button" aria-label="テーマ切り替え">🌙</button>
 </header>
 <main class="wide">
   <h1>作曲モード</h1>
@@ -130,6 +132,7 @@
   <footer class="note">※クリック=選択＆試聴 / 空いている場所にマウスを乗せると点線プレビュー表示→クリックで確定追加 / ドラッグ横=タイミング移動 / ドラッグ縦=半音移調 / ノート上でホイール=長さ変更 / Deleteキー=削除。メロディはピアノ、ベースはアコースティックベースの音色で鳴ります。</footer>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"></script>
+<script type="module" src="js/core/theme.js"></script>
 <script type="module" src="js/pages/composePage.js"></script>
 </body>
 </html>

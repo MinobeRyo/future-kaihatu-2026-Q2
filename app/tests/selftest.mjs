@@ -5,7 +5,7 @@
 
 import {
   buildChord, midiToNoteName, noteNameToPc, degreeToRoman,
-  transposeProgression, chordDisplayName, matchProgressions
+  transposeProgression, chordDisplayName, matchProgressions, noteRole
 } from '../js/core/musicTheory.js';
 import { PROGRESSION_PRESETS, presetToChords } from '../js/data/progressions.js';
 import {
@@ -42,13 +42,23 @@ check('C9 追加音ハイライト', c9.addedByTension.map(midiToNoteName), ['A#
 const cAdd9 = buildChord({ rootPc: 0, type: 'major', octave: 4, tensions: ['add9'] });
 check('Cadd9 構成音（7thなし）', cAdd9.noteNames, ['C4', 'E4', 'G4', 'D5']);
 check('Cadd9 追加音ハイライト', cAdd9.addedByTension.map(midiToNoteName), ['D5']);
+
+console.log('--- 音の役割（積み木タワー用） ---');
+check('ルート', noteRole(0), { key: 'root', label: 'ルート' });
+check('長3度', noteRole(4), { key: 'third', label: '3度（長）' });
+check('短3度', noteRole(3), { key: 'third', label: '3度（短）' });
+check('5度', noteRole(7), { key: 'fifth', label: '5度' });
+check('短7度', noteRole(10), { key: 'seventh', label: '♭7th' });
+check('9th（オクターブ超え）', noteRole(14), { key: 'ninth', label: '9th' });
+check('11th', noteRole(17), { key: 'eleventh', label: '11th' });
+check('13th', noteRole(21), { key: 'thirteenth', label: '13th' });
 // 既に7thを持つコードには9thだけが足される
 const cmaj9 = buildChord({ rootPc: 0, type: 'maj7', octave: 4, tensions: ['9'] });
 check('Cmaj7(9) は7thを重複追加しない', cmaj9.noteNames, ['C4', 'E4', 'G4', 'B4', 'D5']);
 
 console.log('--- 魔法陣の座標計算 ---');
 check('ルートハイライトは既定で外周の0.8倍', getMagicCircleRootRadius(240), 192);
-check('スケール表示時は外周に寄せる', getMagicCircleRootRadius(240, { showDiatonicScale: true }), 240);
+check('スケール表示時も音名の位置（0.8倍）に置く', getMagicCircleRootRadius(240, { showDiatonicScale: true }), 192);
 check('コード三角形表示時は内側に寄せる', getMagicCircleRootRadius(240, { showChordTriangle: true }), 134);
 
 console.log('--- コード表示名（慣習に合わせた整理） ---');

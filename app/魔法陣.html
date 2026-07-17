@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>音楽の魔法陣 | 音楽コード勉強アプリ</title>
+<script>(function(){try{document.documentElement.dataset.theme=localStorage.getItem('theme')||'light';}catch(e){}})();</script>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -15,6 +16,7 @@
   <a href="learn.html">解説</a>
   <a href="魔法陣.html" class="active">魔法陣</a>
   <a href="compare.html">聴き比べ</a>
+  <button id="themeToggle" type="button" aria-label="テーマ切り替え">🌙</button>
 </header>
 <main>
   <h1>音楽の魔法陣</h1>
@@ -59,6 +61,7 @@
   <footer class="note">※旧アプリの魔法陣（クロマチック円＋回転スケールリング＋コード三角形）を移植し、再生機能を実装した版です。</footer>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"></script>
+<script type="module" src="js/core/theme.js"></script>
 <script type="module" src="js/pages/circlePage.js"></script>
 </body>
 </html>

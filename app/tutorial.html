@@ -4,9 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>入門: コードのしくみ | 音楽コード勉強アプリ</title>
+<script>(function(){try{document.documentElement.dataset.theme=localStorage.getItem('theme')||'light';}catch(e){}})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
 </head>
-<body>
+<body class="v2">
 <header class="app-nav">
   <span class="brand">🎹 音楽コード勉強アプリ</span>
   <a href="tutorial.html" class="active">入門</a>
@@ -15,99 +19,149 @@
   <a href="learn.html">解説</a>
   <a href="魔法陣.html">魔法陣</a>
   <a href="compare.html">聴き比べ</a>
+  <button id="themeToggle" type="button" aria-label="テーマ切り替え">🌙</button>
 </header>
 <main>
   <h1>入門: コードのしくみ</h1>
-  <p class="lead">理屈は後回し。まずボタンを押して音を聴いて、そのあと種明かしを読む。6ステップでコードの構造がわかる。</p>
+  <p class="lead">理屈は後回し。まずボタンを押して音を聴いて、そのあと種明かしを読む。1画面1テーマの7ステップでコードの構造がわかる。</p>
 
-  <h2>STEP 1　すべての基本は「半音」</h2>
-  <section class="panel">
-    <p>ピアノの鍵盤は、隣どうしが「半音」の階段になっている（黒鍵も1段に数える）。まず2つの距離を聴き比べてみて。</p>
-    <div class="row">
-      <button id="halfBtn" class="primary">半音（C→C#）▶</button>
-      <button id="wholeBtn" class="primary">全音（C→D）▶</button>
-    </div>
-    <div id="kb1"></div>
-    <div class="caption-box">音の距離はぜんぶ「半音いくつぶん」で数えられる。半音=1段、全音=2段。これだけ覚えればOK。</div>
-  </section>
+  <!-- ステップフローバー: クリックで任意のステップへ直接ジャンプできる（＝スキップ操作を兼ねる） -->
+  <nav class="step-flow" id="stepFlow"></nav>
+  <div class="step-progress"><div class="step-progress-fill" id="stepProgressFill"></div></div>
 
-  <h2>STEP 2　コードの材料は「3度」</h2>
-  <section class="panel">
-    <p>コードで一番大事な距離が「3度」。ボタンを押すと、選んだルートから<strong>鍵盤を1段ずつ数えながら</strong>上っていきます。ルートを変えて、何段目に着くかを見比べてみて。</p>
-    <div class="row">
-      <label class="field">ルート（数え始めの音）
-        <select id="countRootSelect"></select>
-      </label>
-      <button id="majThirdBtn" class="primary">長3度（4段上）を数える ▶</button>
-      <button id="minThirdBtn" class="primary">短3度（3段上）を数える ▶</button>
-      <span id="countLabel" style="font-weight:bold; color:var(--accent-2); font-size:15px;"></span>
-    </div>
-    <div id="kb2"></div>
-    <div class="caption-box">数え方はこれだけ: <strong>黒鍵も含めて、隣の鍵盤へ1段＝半音1つ</strong>（STEP1の階段）。そして大事なのは、<strong>これはCだけの話ではなく、どの音から数えても「4段上＝長3度・3段上＝短3度」</strong>ということ。Cから4段ならE、Dから4段ならF#（黒鍵！）——Dメジャーに黒鍵が入るのは、こうして数えた結果。着地する鍵盤の色は関係なく、<strong>距離だけがルール</strong>。単体で聴くと長3度は明るめ、短3度は暗めに聴こえやすいけど、これは「傾向」。コードの明暗が本当に何で決まるかは次のSTEPで種明かし。</div>
-  </section>
+  <div class="step-panel active" data-step="0">
+    <h2>STEP 1　すべての基本は「半音」</h2>
+    <section class="panel">
+      <p>ピアノの鍵盤は、隣どうしが「半音」の階段になっている（黒鍵も1段に数える）。まず2つの距離を聴き比べてみて。</p>
+      <div class="row">
+        <button id="halfBtn" class="primary">半音（C→C#）▶</button>
+        <button id="wholeBtn" class="primary">全音（C→D）▶</button>
+      </div>
+      <div id="kb1"></div>
+      <div class="caption-box">👆 2つのボタンを押し比べて、近さの違いを耳で感じてみて。</div>
+      <details class="step-detail">
+        <summary>🔍 もっと詳しく</summary>
+        <p>音の距離はぜんぶ「半音いくつぶん」で数えられる。半音=1段、全音=2段。これだけ覚えればOK。</p>
+      </details>
+    </section>
+  </div>
 
-  <h2>STEP 3　三和音 ＝ 3度を2回積む</h2>
-  <section class="panel">
-    <p>3度を2回積み重ねると「コード」になる。下の3度が長か短かに注目して聴いてみて（3度の音を色付きで表示）。</p>
-    <div class="row">
-      <button id="cMajorBtn" class="primary">Cメジャー（長3度＋短3度）▶</button>
-      <button id="cMinorBtn" class="primary">Cマイナー（短3度＋長3度）▶</button>
-      <button id="cDimBtn">Cdim（短3度＋短3度）▶</button>
-      <button id="cAugBtn">Caug（長3度＋長3度）▶</button>
-    </div>
-    <div id="kb3"></div>
-    <div class="caption-box">種明かし: 実は<strong>メジャーもマイナーも、長3度と短3度を1つずつ持っている</strong>（積む順番が違うだけ）。だから明暗のスイッチは「3度が入っているか」ではなく、<strong>ルート（一番下の土台の音）から数えた真ん中の音までの距離</strong>。<br><br>
-    判定のやり方: ① 一番下の音（ルート）に指を置く → ② 黒鍵も含めて1段ずつ数えて真ん中の音まで何段か数える → ③ <strong>4段ならメジャー（明るい）、3段ならマイナー（切ない）</strong>。Cメジャーはド→ミで4段、Cマイナーはド→ミ♭で3段。<br><br>
-    ちなみに短3度だけで積むとdim（不安・緊張）、長3度だけで積むとaug（不思議・浮遊）——組み合わせは4通りで、三和音の性格はこれで全部決まる。</div>
-  </section>
+  <div class="step-panel" data-step="1">
+    <h2>STEP 2　コードの材料は「3度」</h2>
+    <section class="panel">
+      <p>コードで一番大事な距離が「3度」。ボタンを押すと、選んだルートから<strong>鍵盤を1段ずつ数えながら</strong>上っていきます。ルートを変えて、何段目に着くかを見比べてみて。</p>
+      <div class="row">
+        <label class="field">ルート（数え始めの音）
+          <select id="countRootSelect"></select>
+        </label>
+        <button id="majThirdBtn" class="primary">長3度（4段上）を数える ▶</button>
+        <button id="minThirdBtn" class="primary">短3度（3段上）を数える ▶</button>
+        <span id="countLabel" style="font-weight:bold; color:var(--accent-2); font-size:15px;"></span>
+      </div>
+      <div id="kb2"></div>
+      <div class="caption-box">👂 黒鍵も含めて、隣の鍵盤へ1段＝半音1つ。<strong>4段上なら長3度、3段上なら短3度</strong>。</div>
+      <details class="step-detail">
+        <summary>🔍 もっと詳しく</summary>
+        <p>数え方はこれだけ: <strong>黒鍵も含めて、隣の鍵盤へ1段＝半音1つ</strong>（STEP1の階段）。そして大事なのは、<strong>これはCだけの話ではなく、どの音から数えても「4段上＝長3度・3段上＝短3度」</strong>ということ。Cから4段ならE、Dから4段ならF#（黒鍵！）——Dメジャーに黒鍵が入るのは、こうして数えた結果。着地する鍵盤の色は関係なく、<strong>距離だけがルール</strong>。単体で聴くと長3度は明るめ、短3度は暗めに聴こえやすいけど、これは「傾向」。コードの明暗が本当に何で決まるかは次のSTEPで種明かし。</p>
+      </details>
+    </section>
+  </div>
 
-  <h2>STEP 4　形が同じなら、どこから始めても同じ響き</h2>
-  <section class="panel">
-    <p>「長3度＋短3度」という形をそのまま右にずらすと…？ C→D→Eの順でメジャーコードを鳴らします。</p>
-    <div class="row">
-      <button id="shapeBtn" class="primary">同じ形をずらして鳴らす ▶</button>
-    </div>
-    <div id="kb4"></div>
-    <div class="caption-box">高さは変わるのに、どれも「メジャーの明るさ」のまま。<strong>コードの性格は音の高さではなく「距離の組み合わせ（形）」で決まる</strong>。これが移調してもキーが変わっても曲の印象が保たれる理由で、魔法陣で図形を回すのはこの「形の移動」を見ているんです。</div>
-  </section>
+  <div class="step-panel" data-step="2">
+    <h2>STEP 3　三和音 ＝ 3度を2回積む</h2>
+    <section class="panel">
+      <p>3度を2回積み重ねると「コード」になる。下の3度が長か短かに注目して聴いてみて（3度の音を色付きで表示）。</p>
+      <div class="row">
+        <button id="cMajorBtn" class="primary">Cメジャー（長3度＋短3度）▶</button>
+        <button id="cMinorBtn" class="primary">Cマイナー（短3度＋長3度）▶</button>
+        <button id="cDimBtn">Cdim（短3度＋短3度）▶</button>
+        <button id="cAugBtn">Caug（長3度＋長3度）▶</button>
+      </div>
+      <div id="kb3"></div>
+      <div class="caption-box">🎹 4つのボタンで響きを聴き比べ。真ん中の音（3度）が違うだけで印象が変わる。</div>
+      <details class="step-detail">
+        <summary>🔍 もっと詳しく（種明かし）</summary>
+        <p>実は<strong>メジャーもマイナーも、長3度と短3度を1つずつ持っている</strong>（積む順番が違うだけ）。だから明暗のスイッチは「3度が入っているか」ではなく、<strong>ルート（一番下の土台の音）から数えた真ん中の音までの距離</strong>。<br><br>
+        判定のやり方: ① 一番下の音（ルート）に指を置く → ② 黒鍵も含めて1段ずつ数えて真ん中の音まで何段か数える → ③ <strong>4段ならメジャー（明るい）、3段ならマイナー（切ない）</strong>。Cメジャーはド→ミで4段、Cマイナーはド→ミ♭で3段。<br><br>
+        ちなみに短3度だけで積むとdim（不安・緊張）、長3度だけで積むとaug（不思議・浮遊）——組み合わせは4通りで、三和音の性格はこれで全部決まる。</p>
+      </details>
+    </section>
+  </div>
 
-  <h2>STEP 5　4和音 ＝ もう1回3度を積む（セブンス）</h2>
-  <section class="panel">
-    <p>三和音の上にさらに3度を積むと4和音（セブンスコード）。一番上に何を積むかで大人度が変わる（追加された音を色付きで表示）。</p>
-    <div class="row">
-      <button id="maj7Btn" class="primary">Cmaj7（+長3度）▶</button>
-      <button id="dom7Btn" class="primary">C7（+短3度）▶</button>
-      <button id="m7Btn" class="primary">Cm7 ▶</button>
-    </div>
-    <div id="kb5"></div>
-    <div class="caption-box">コードは<strong>ぜんぶ「3度の積み木」</strong>。3つ積めば三和音、4つでセブンス、さらに積むと9th・11th・13th（練習モードのテンションボタン）になる。名前が難しそうでも、やってることは積み木を1段増やしてるだけ。</div>
-  </section>
+  <div class="step-panel" data-step="3">
+    <h2>STEP 4　形が同じなら、どこから始めても同じ響き</h2>
+    <section class="panel">
+      <p>「長3度＋短3度」という形をそのまま右にずらすと…？ C→D→Eの順でメジャーコードを鳴らします。</p>
+      <div class="row">
+        <button id="shapeBtn" class="primary">同じ形をずらして鳴らす ▶</button>
+      </div>
+      <div id="kb4"></div>
+      <div class="caption-box">🎚️ 高さは変わるのに、どれも「メジャーの明るさ」のまま。</div>
+      <details class="step-detail">
+        <summary>🔍 もっと詳しく</summary>
+        <p><strong>コードの性格は音の高さではなく「距離の組み合わせ（形）」で決まる</strong>。これが移調してもキーが変わっても曲の印象が保たれる理由で、魔法陣で図形を回すのはこの「形の移動」を見ているんです。</p>
+      </details>
+    </section>
+  </div>
 
-  <h2>STEP 6　同じ音なのに、名前が変わる！？</h2>
-  <section class="panel">
-    <p>ド・ミ・ソ・ラの4音。これ、<strong>C6</strong>でもあり<strong>Am7</strong>でもある。ウソだと思うなら、ベースの音だけ変えて聴いてみて（ベース音を色付きで表示）。</p>
-    <div class="row">
-      <button id="notesOnlyBtn">4音だけ ▶</button>
-      <button id="cBassBtn" class="primary">＋低いド → C6に聴こえる ▶</button>
-      <button id="aBassBtn" class="primary">＋低いラ → Am7に聴こえる ▶</button>
-    </div>
-    <div id="kb6"></div>
-    <div class="caption-box">上の4音はまったく同じなのに、<strong>耳が「どの音を土台（ルート）と感じるか」でコードの意味も名前も変わる</strong>。CメジャーとAマイナーが親戚（平行調）なのもこの仕組み。魔法陣で「メジャー」と「マイナー」のラベルが同じリングに付いているのは、これを表している。</div>
-  </section>
+  <div class="step-panel" data-step="4">
+    <h2>STEP 5　4和音 ＝ もう1回3度を積む（セブンス）</h2>
+    <section class="panel">
+      <p>三和音の上にさらに3度を積むと4和音（セブンスコード）。一番上に何を積むかで大人度が変わる（追加された音を色付きで表示）。</p>
+      <div class="row">
+        <button id="maj7Btn" class="primary">Cmaj7（+長3度）▶</button>
+        <button id="dom7Btn" class="primary">C7（+短3度）▶</button>
+        <button id="m7Btn" class="primary">Cm7 ▶</button>
+      </div>
+      <div id="kb5"></div>
+      <div class="caption-box">🧱 三和音にもう1段積むとセブンス。追加された音（色付き）を鍵盤で確認して。</div>
+      <details class="step-detail">
+        <summary>🔍 もっと詳しく</summary>
+        <p>コードは<strong>ぜんぶ「3度の積み木」</strong>。3つ積めば三和音、4つでセブンス、さらに積むと9th・11th・13th（練習モードのテンションボタン）になる。名前が難しそうでも、やってることは積み木を1段増やしてるだけ。</p>
+      </details>
+    </section>
+  </div>
 
-  <h2>卒業！次はどこへ？</h2>
-  <section class="panel">
-    <p>コードは「3度の積み木」で、性格は「距離の形」で決まり、名前は「どこをルートと感じるか」で変わる。この3つがわかれば、もう各ページを楽しめます。</p>
-    <div class="row">
-      <a href="index.html"><button type="button">練習モードでテンションを積む →</button></a>
-      <a href="魔法陣.html"><button type="button">魔法陣で「形の回転」を見る →</button></a>
-      <a href="compare.html"><button type="button">進行の聴き比べへ →</button></a>
-    </div>
-  </section>
+  <div class="step-panel" data-step="5">
+    <h2>STEP 6　同じ音なのに、名前が変わる！？</h2>
+    <section class="panel">
+      <p>ド・ミ・ソ・ラの4音。これ、<strong>C6</strong>でもあり<strong>Am7</strong>でもある。ウソだと思うなら、ベースの音だけ変えて聴いてみて（ベース音を色付きで表示）。</p>
+      <div class="row">
+        <button id="notesOnlyBtn">4音だけ ▶</button>
+        <button id="cBassBtn" class="primary">＋低いド → C6に聴こえる ▶</button>
+        <button id="aBassBtn" class="primary">＋低いラ → Am7に聴こえる ▶</button>
+      </div>
+      <div id="kb6"></div>
+      <div class="caption-box">🔗 ベース音だけ変えて、同じ4音の聴こえ方がどう変わるか比べてみて。</div>
+      <details class="step-detail">
+        <summary>🔍 もっと詳しく</summary>
+        <p>上の4音はまったく同じなのに、<strong>耳が「どの音を土台（ルート）と感じるか」でコードの意味も名前も変わる</strong>。CメジャーとAマイナーが親戚（平行調）なのもこの仕組み。魔法陣で「メジャー」と「マイナー」のラベルが同じリングに付いているのは、これを表している。</p>
+      </details>
+    </section>
+  </div>
 
-  <footer class="note">※音が鳴らないときは、ページ内のどれかのボタンを一度押してください（ブラウザの仕様で、最初のクリックまで音源を読み込めません）。</footer>
+  <div class="step-panel" data-step="6">
+    <h2>卒業！次はどこへ？</h2>
+    <section class="panel">
+      <p>コードは「3度の積み木」で、性格は「距離の形」で決まり、名前は「どこをルートと感じるか」で変わる。この3つがわかれば、もう各ページを楽しめます。</p>
+      <div class="row">
+        <a href="index.html"><button type="button">練習モードでテンションを積む →</button></a>
+        <a href="魔法陣.html"><button type="button">魔法陣で「形の回転」を見る →</button></a>
+        <a href="compare.html"><button type="button">進行の聴き比べへ →</button></a>
+      </div>
+    </section>
+  </div>
+
+  <div class="step-nav">
+    <button id="stepPrevBtn" type="button">← まえへ</button>
+    <span id="stepCounter" style="font-size:12px; color:var(--muted);"></span>
+    <button id="stepNextBtn" type="button" class="primary">つぎへ →</button>
+  </div>
+
+  <footer class="note">※音が鳴らないときは、ページ内のどれかのボタンを一度押してください（ブラウザの仕様で、最初のクリックまで音源を読み込めません）。上部のステップアイコンをクリックすると、好きなステップへ直接ジャンプできます。</footer>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"></script>
+<script type="module" src="js/core/theme.js"></script>
 <script type="module" src="js/pages/tutorialPage.js"></script>
 </body>
 </html>
