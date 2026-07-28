@@ -10,12 +10,15 @@
 
 import {
   NOTE_LETTERS, CHORD_INTERVALS, CHORD_TYPE_LABELS, TENSIONS,
-  buildChord, chordDisplayName, pcToMidi, noteRole, midiToNoteName
+  buildChord, chordDisplayName, chordBreakdown, pcToMidi, noteRole,
+  midiDisplayName, pcName, solfegeName, setDisplayKey, chordSpellingMap
 } from '../core/musicTheory.js';
 import { initAudio, loadInstrument, playNow } from '../core/audioEngine.js';
 import { tensionCaption, VOICING_CAPTIONS, complexityLevel } from '../data/captions.js';
 
-const SOLFEGE = { 0: 'ド', 1: 'ド#', 2: 'レ', 3: 'レ#', 4: 'ミ', 5: 'ファ', 6: 'ファ#', 7: 'ソ', 8: 'ソ#', 9: 'ラ', 10: 'ラ#', 11: 'シ' };
+// 音名の文字 → ドレミ（固定ド）。変化記号はそのまま引き継ぐので
+// 「ラ♯（B♭5）」のようにドレミと音名で食い違うことがない。
+const SOLFEGE_OF = { C: 'ド', D: 'レ', E: 'ミ', F: 'ファ', G: 'ソ', A: 'ラ', B: 'シ' };
 
 const rootSelect = document.getElementById('rootSelect');
 const typeSelect = document.getElementById('typeSelect');
@@ -80,7 +83,7 @@ function flashAll() {
 // 選択中ルート
 NOTE_LETTERS.forEach((n, i) => {
   const opt = document.createElement('option');
-  opt.value = i; opt.textContent = n;
+  opt.value = i; opt.textContent = pcName(i);
   if (i === 0) opt.selected = true;
   rootSelect.appendChild(opt);
 });
@@ -170,6 +173,15 @@ function highlightKeyboard(chord, baseMidi) {
 function renderTower(chord, baseMidi) {
   towerBlocksEl.innerHTML = '';
   towerChipsEl.innerHTML = '';
+  // 音名は「このコードの中で何度か」で綴る（Cdim の第3音は F♯ ではなく G♭）
+  const spell = chordSpellingMap(
+    Number(rootSelect.value), typeSelect.value, Array.from(activeTensions));
+  const nameOf = (m) => (spell.get(((m % 12) + 12) % 12)?.name ?? pcName(m % 12))
+    + (Math.floor(m / 12) - 1);
+  const doOf = (m) => {
+    const n = spell.get(((m % 12) + 12) % 12)?.name;
+    return n ? (SOLFEGE_OF[n[0]] ?? '') + n.slice(1) : solfegeName(m % 12);
+  };
   const sorted = [...chord.midi].sort((a, b) => a - b);
   const df = dropFrom;
   dropFrom = 0; // 消費したら既定（全ブロック落下）に戻す
@@ -200,7 +212,7 @@ function renderTower(chord, baseMidi) {
     if (i < df) block.style.animation = 'none'; // すでに積んであった段は動かさない
     block.dataset.midi = m; // 「1音ずつ積んで聴く」の音同期用
     // .blk-inner: 強調発光を担当する層（外側は落下を担当）
-    block.innerHTML = `<span class="blk-inner"><span>${SOLFEGE[m % 12] ?? ''}（${midiToNoteName(m)}）</span><span class="role">${role.label || '—'}</span></span>`;
+    block.innerHTML = `<span class="blk-inner"><span>${doOf(m)}（${nameOf(m)}）</span><span class="role">${role.label || '—'}</span></span>`;
     block.addEventListener('click', async () => {
       flashInner(block.firstElementChild);
       await ensureAudio();
@@ -215,7 +227,7 @@ function renderTower(chord, baseMidi) {
     if (i < df) chip.style.animation = 'none'; // ブロックが落ちないときはチップもポップインさせない
     chip.style.borderColor = `color-mix(in srgb, ${v} 60%, transparent)`;
     chip.style.background = `color-mix(in srgb, ${v} 30%, transparent)`;
-    chip.textContent = `${SOLFEGE[m % 12] ?? ''} ${role.label || ''}`.trim();
+    chip.textContent = `${doOf(m)} ${role.label || ''}`.trim();
     chip.addEventListener('click', async () => {
       await ensureAudio();
       playNow([m], { duration: 0.9 });
@@ -234,7 +246,12 @@ function renderTower(chord, baseMidi) {
 
   const level = complexityLevel(chord.midi.length);
   const sparkle = '✨'.repeat(Math.max(0, level.level - 1));
-  towerFeelEl.textContent = `${level.label}な響き ${sparkle}（音${chord.midi.length}個）`;
+  // m7 に 9th を足すと慣習表記は Am9 になり、名前から 7 が消えたように見える。
+  // 何に何を足した形なのかを添えて、消えたわけではないことを示す。
+  const breakdown = chordBreakdown(
+    Number(rootSelect.value), typeSelect.value, Array.from(activeTensions));
+  towerFeelEl.textContent = `${level.label}な響き ${sparkle}（音${chord.midi.length}個）`
+    + (breakdown ? `　＝ ${breakdown}` : '');
 }
 
 function currentChordOpts() {
@@ -262,6 +279,9 @@ function updateStackButtons(total) {
 function render() {
   const opts = currentChordOpts();
   const chord = buildChord(opts);
+  // このページは「1つのコードを見る」画面なので、音名の綴りはコードのルートを基準にする。
+  // （キーC固定だと A♭m7 の♭7thが G♭ ではなく F♯ と表示されてしまう）
+  setDisplayKey(opts.rootPc);
   const baseMidi = pcToMidi(opts.rootPc, opts.octave);
   const sorted = [...chord.midi].sort((a, b) => a - b);
   // stackNが設定されていれば、低い方からその数だけ表示・ハイライトする
@@ -364,7 +384,7 @@ if (stackAddBtn && stackRemoveBtn) {
     const added = sorted[next - 1];
     playNow(sorted.slice(0, next), { duration: 1.3 });
     const role = noteRole(added - baseMidi);
-    setCaption(`${SOLFEGE[added % 12] ?? ''}（${role.label || '音'}）を積みました。響きの変化を聴いてみて。`);
+    setCaption(`${solfegeName(added % 12)}（${role.label || '音'}）を積みました。響きの変化を聴いてみて。`);
   });
 
   stackRemoveBtn.addEventListener('click', async () => {
@@ -425,3 +445,9 @@ abTensionBtn.addEventListener('click', async () => {
 });
 
 render();
+
+// 音名表記（♯/♭）が切り替わったら、音名を出している所を描き直す
+document.addEventListener('notationchange', () => {
+  rootSelect.querySelectorAll('option').forEach((o, i) => { o.textContent = pcName(i); });
+  render();
+});

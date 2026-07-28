@@ -12,7 +12,7 @@
 // 音は鳴らさない（audioEngineとの接続はページ側が行う）。
 // ========================================
 
-import { NOTE_LETTERS } from '../core/musicTheory.js';
+import { pcName } from '../core/musicTheory.js';
 
 const COLORS = {
   bg: '#ffffff',
@@ -250,7 +250,7 @@ export class MagicCircle {
     for (let i = 0; i < 12; i++) {
       const angle = i * STEP + TOP_OFFSET;
       ctx.fillText(
-        NOTE_LETTERS[i],
+        pcName(i),
         this.centerX + Math.cos(angle) * this.radius * 0.8,
         this.centerY + Math.sin(angle) * this.radius * 0.8);
     }

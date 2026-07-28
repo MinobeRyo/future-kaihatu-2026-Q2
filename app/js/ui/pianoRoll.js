@@ -8,7 +8,7 @@
 //       何もない場所にマウスを乗せると点線プレビュー→クリックで確定追加
 // ========================================
 
-import { midiToNoteName, chordDisplayName } from '../core/musicTheory.js';
+import { midiDisplayName, chordDisplayName } from '../core/musicTheory.js';
 import { TRACKS, eventMidi, timelineEnd, fixedPitchRange } from '../core/timeline.js';
 
 export const COUNT_W = 64;  // 1カウントの幅(px)
@@ -116,7 +116,7 @@ export function createPianoRoll(rootEl, { onSelect, onCommit, onResize, onResize
       row.className = 'proll-key' + (BLACK.has(m % 12) ? ' black' : ' white') + (isC ? ' c-key' : '');
       row.style.height = `${ROW_H}px`;
       row.style.lineHeight = `${ROW_H}px`;
-      if (isC) row.textContent = midiToNoteName(m); // Cだけ音名表示（見やすさ優先）
+      if (isC) row.textContent = midiDisplayName(m); // Cだけ音名表示（見やすさ優先）
       keys.appendChild(row);
     }
     inner.appendChild(keys);
@@ -182,7 +182,7 @@ export function createPianoRoll(rootEl, { onSelect, onCommit, onResize, onResize
           if (track === 'chord' && m === topMost) {
             b.textContent = chordDisplayName(ev.rootPc, ev.type);
           } else if (track !== 'chord') {
-            b.textContent = midiToNoteName(m);
+            b.textContent = midiDisplayName(m);
           }
           canvas.appendChild(b);
         }

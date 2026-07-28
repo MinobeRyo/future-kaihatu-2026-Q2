@@ -5,7 +5,7 @@
 // 旧版で未実装だった再生を実際に鳴るようにした。
 // ========================================
 
-import { NOTE_LETTERS, buildChord, chordDisplayName } from '../core/musicTheory.js';
+import { NOTE_LETTERS, pcName, buildChord, chordDisplayName } from '../core/musicTheory.js';
 import { initAudio, loadInstrument, playNow, playTracks, stop } from '../core/audioEngine.js';
 import { PROGRESSION_PRESETS, presetToChords } from '../data/progressions.js';
 import { MagicCircle } from '../ui/magicCircle.js';
@@ -37,7 +37,7 @@ function currentChordOpts() {
 
 function updateChordLabel() {
   const mode = CHORD_MODES[chordMode];
-  circle.setChordLabel(NOTE_LETTERS[circle.getRoot()] + mode.suffix);
+  circle.setChordLabel(pcName(circle.getRoot()) + mode.suffix);
 }
 updateChordLabel();
 
@@ -119,4 +119,10 @@ playProgBtn.addEventListener('click', async () => {
 stopBtn.addEventListener('click', () => {
   stop();
   currentChordEl.textContent = '';
+});
+
+// 音名表記（♯/♭）が切り替わったら、円周の音名とコード名を描き直す
+document.addEventListener('notationchange', () => {
+  circle.draw?.();
+  updateChordLabel();
 });

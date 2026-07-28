@@ -62,10 +62,121 @@ export function pcToMidi(pc, octave) {
   return 12 * (octave + 1) + pc;
 }
 
-/** MIDI番号 → 音名（例: 60 → 'C4'） */
+/**
+ * MIDI番号 → 音名（例: 60 → 'C4'）
+ * これは「内部用・音源に渡す用」の名前。必ず ASCII のシャープ表記になる
+ * （soundfont-player の note-parser が読める形にしておく必要があるため）。
+ * 画面に出す名前は midiDisplayName() を使うこと。
+ */
 export function midiToNoteName(midi) {
   const octave = Math.floor(midi / 12) - 1;
   return NOTE_LETTERS[midi % 12] + octave;
+}
+
+// ============================================================
+// 表示用の音名（♯/♭の綴り分け）
+// ============================================================
+// これまで音名は NOTE_LETTERS のシャープ固定で、A♭ や B♭ を出せなかった。
+// 正しい綴りは「キーの中で何度の音か」で決まる。たとえば同じ音(pc=8)でも、
+// キーCでは b6 なので A♭、キーEでは #5 なので G♯ が正しい。
+// ここでは度数から綴りを計算する。内部処理・音源は上の NOTE_LETTERS のまま。
+
+const LETTERS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+const LETTER_PC = [0, 2, 4, 5, 7, 9, 11];
+
+// メジャーキーの主音表記（慣習に合わせ D♭/E♭/G♭/A♭/B♭ を採る）→ [文字index, 変化記号]
+const KEY_TONIC = [
+  [0, 0], [1, -1], [1, 0], [2, -1], [2, 0], [3, 0],
+  [4, -1], [4, 0], [5, -1], [5, 0], [6, -1], [6, 0]
+];
+// キーからの半音差 → 度数(1〜7)。b2,b3,#4,b6,b7 は隣の度数の変化音として扱う
+const DEGREE_OF_OFF = [1, 2, 2, 3, 3, 4, 4, 5, 6, 6, 7, 7];
+
+const SHARP_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+const FLAT_NAMES = ['C', 'D♭', 'D', 'E♭', 'E', 'F', 'G♭', 'G', 'A♭', 'A', 'B♭', 'B'];
+
+/** 表示モード。auto はキーから綴りを決める */
+export const NOTATION_MODES = [
+  { id: 'auto', label: '自動', desc: 'キーに合わせて正しい綴りを選びます（キーCなら A♭、キーDなら F♯）' },
+  { id: 'sharp', label: '♯', desc: 'すべてシャープで表記します' },
+  { id: 'flat', label: '♭', desc: 'すべてフラットで表記します' },
+  { id: 'both', label: '両方', desc: '主表記のとなりに、もう一方の呼び方を小さく添えます' }
+];
+
+let notationMode = 'auto';
+let displayKeyPc = 0;
+
+export function setNotation(mode) {
+  notationMode = NOTATION_MODES.some(m => m.id === mode) ? mode : 'auto';
+}
+export function getNotation() { return notationMode; }
+/** 自動モードで綴りを決める基準になるキーを設定する（各ページがキー変更時に呼ぶ） */
+export function setDisplayKey(pc) { displayKeyPc = ((pc % 12) + 12) % 12; }
+export function getDisplayKey() { return displayKeyPc; }
+
+/** キーの中での度数から、理論的に正しい綴りを組み立てる */
+function spellByKey(pc, keyPc) {
+  // 白鍵はそのまま文字で出す。理論上は キーB の #4 が E♯ になるが、
+  // 初心者向けなので E と読める形を優先する（重変記号も同じ理由で避ける）
+  const white = LETTER_PC.indexOf(pc);
+  if (white !== -1) return LETTERS[white];
+
+  const [tonicLetter] = KEY_TONIC[((keyPc % 12) + 12) % 12];
+  const off = ((pc - keyPc) % 12 + 12) % 12;
+  const li = (tonicLetter + DEGREE_OF_OFF[off] - 1) % 7;
+  let acc = ((pc - LETTER_PC[li]) % 12 + 12) % 12;
+  if (acc > 6) acc -= 12;                       // 上下どちらに近いかで符号を決める
+  if (acc < -1 || acc > 1) return FLAT_NAMES[pc]; // 重変記号が要るなら諦めてフラット表記
+  return LETTERS[li] + (acc > 0 ? '♯' : acc < 0 ? '♭' : '');
+}
+
+/**
+ * ピッチクラス → 画面に出す音名。
+ * @param {number} pc 0-11
+ * @param {number} [keyPc] 綴りの基準になるキー（省略時は setDisplayKey で設定した値）
+ */
+export function pcName(pc, keyPc = displayKeyPc) {
+  const p = ((pc % 12) + 12) % 12;
+  switch (notationMode) {
+    case 'sharp': return SHARP_NAMES[p];
+    case 'flat': return FLAT_NAMES[p];
+    // 「両方」も主表記は自動と同じ。もう一方は pcAltName() で別に取り、
+    // UI側で小さく添える。名前の中に "/" を混ぜるとコード名が読みにくくなるため。
+    default: return spellByKey(p, keyPc);
+  }
+}
+
+/**
+ * 異名同音のもう一方の呼び方。「両方」モードのときだけ返す。
+ * 黒鍵の5音にしか別表記は無いので、白鍵と他モードでは null。
+ */
+export function pcAltName(pc, keyPc = displayKeyPc) {
+  if (notationMode !== 'both') return null;
+  const p = ((pc % 12) + 12) % 12;
+  if (SHARP_NAMES[p] === FLAT_NAMES[p]) return null;
+  const main = pcName(p, keyPc);
+  return main === SHARP_NAMES[p] ? FLAT_NAMES[p] : SHARP_NAMES[p];
+}
+
+/** MIDI番号 → 画面に出す音名（例: 68 → キーCなら 'A♭4'） */
+export function midiDisplayName(midi, keyPc = displayKeyPc) {
+  return pcName(((midi % 12) + 12) % 12, keyPc) + (Math.floor(midi / 12) - 1);
+}
+
+/** MIDI番号のもう一方の呼び方（「両方」モードのみ。無ければ null） */
+export function midiAltName(midi, keyPc = displayKeyPc) {
+  const alt = pcAltName(((midi % 12) + 12) % 12, keyPc);
+  return alt ? alt + (Math.floor(midi / 12) - 1) : null;
+}
+
+// 固定ド（C=ド）のソルフェージュ。音名の綴りにそのまま追従させる——
+// 「ラ♯（B♭5）」のように、ドレミと音名で変化記号が食い違うのを防ぐため。
+const SOLFEGE_OF_LETTER = { C: 'ド', D: 'レ', E: 'ミ', F: 'ファ', G: 'ソ', A: 'ラ', B: 'シ' };
+
+/** ピッチクラス → ドレミ表記（例: pc=8 は キーCなら 'ラ♭'、♯モードなら 'ソ♯'） */
+export function solfegeName(pc, keyPc = displayKeyPc) {
+  const n = pcName(pc, keyPc);
+  return (SOLFEGE_OF_LETTER[n[0]] ?? '') + n.slice(1);
 }
 
 // ---------- コード構築 ----------
@@ -254,8 +365,8 @@ export function transposeProgression(chords, semitones) {
  *   - 6thとadd9の同時押しは「シックスナインス」C6/9 と表記
  *   - 7thを持つコードではadd9も9thと同じ扱い（Cmaj7+add9 → Cmaj9）
  */
-export function chordDisplayName(rootPc, type, tensions = []) {
-  const root = NOTE_LETTERS[rootPc];
+export function chordDisplayName(rootPc, type, tensions = [], keyPc = undefined) {
+  const root = pcName(rootPc, keyPc ?? getDisplayKey());
   const base = CHORD_TYPE_LABELS[type] ?? '';
   if (tensions.length === 0) return root + base;
 
@@ -273,10 +384,12 @@ export function chordDisplayName(rootPc, type, tensions = []) {
 
   let name;
   if (ext) {
-    if (type === 'major' || type === '7') name = root + ext;             // C9, D13
-    else if (type === 'maj7') name = `${root}maj${ext}`;                 // Cmaj9
-    else if (type === 'minor' || type === 'm7') name = `${root}m${ext}`; // Cm9
-    else name = `${root}${base}(${ext}th)`;                              // sus4等はそのまま併記
+    if (type === 'major' || type === '7') name = root + ext;              // C9, D13
+    else if (type === 'maj7') name = `${root}maj${ext}`;                  // Cmaj9
+    else if (type === 'minor' || type === 'm7') name = `${root}m${ext}`;  // Cm9
+    else if (type === 'm7b5') name = `${root}m${ext}♭5`;                  // Cm9♭5
+    else if (type === 'mmaj7') name = `${root}mM${ext}`;                  // CmM9
+    else name = `${root}${base}(${ext})`;                                 // sus4/dim等は併記
   } else {
     name = root + base;
   }
@@ -284,13 +397,149 @@ export function chordDisplayName(rootPc, type, tensions = []) {
   const has6 = t.delete('6');
   const hasAdd9 = t.delete('add9');
   if (has6 && hasAdd9 && !ext) {
-    name += '6/9'; // シックスナインス
+    // シックスナインス。ただし直前が数字なら「Csus46/9」になるので括弧でくくる
+    name += /\d$/.test(name) ? '(6/9)' : '6/9';
   } else {
-    if (has6) name += ext ? '(6)' : '6';
+    // 直前が数字で終わっていると「m76」のように読めなくなるので括弧でくくる
+    if (has6) name += (ext || /\d$/.test(name)) ? '(6)' : '6';
     if (hasAdd9) name += (type === 'minor' ? '(add9)' : 'add9');
   }
 
   // 将来のテンション追加用フォールバック
   if (t.size) name += `(${[...t].map(x => TENSIONS[x]?.label ?? x).join(',')})`;
   return name;
+}
+
+/**
+ * コード名の「もう一方の呼び方」。「両方」モードのときだけ返す。
+ * ルートの綴りだけを差し替える（A♭m7♭5 ↔ G♯m7♭5）。
+ */
+export function chordAltName(rootPc, type, tensions = [], keyPc = undefined) {
+  const k = keyPc ?? getDisplayKey();
+  const alt = pcAltName(rootPc, k);
+  if (!alt) return null;
+  const main = pcName(rootPc, k);
+  return alt + chordDisplayName(rootPc, type, tensions, k).slice(main.length);
+}
+
+/**
+ * 表示名が元のコードタイプを隠してしまうときに、「何に何を足した形か」を返す。
+ * 例: m7 に 9th を足すと慣習表記は Cm9 になり、名前から 7 が消えて見える。
+ * 隠れておらず、暗黙の7thも足されていない場合は null。
+ */
+export function chordBreakdown(rootPc, type, tensions = [], keyPc = undefined) {
+  if (!tensions || tensions.length === 0) return null;
+  const bare = chordDisplayName(rootPc, type, [], keyPc);
+  const full = chordDisplayName(rootPc, type, tensions, keyPc);
+  const labels = tensions.map(x => TENSIONS[x]?.label ?? x).join(' + ');
+  const has7 = (CHORD_INTERVALS[type] || []).some(i => i === 10 || i === 11);
+  // 9th/11th/13thは7thの上に積むテンションなので、7thの無いコードに付けると♭7thも増える
+  const adds7 = !has7 && tensions.some(x => TENSIONS[x]?.implies7);
+  const hidden = !full.startsWith(bare);
+  if (!hidden && !adds7) return null;
+  let s = `${bare} に ${labels} を足した形`;
+  if (adds7) s += '（9th以上は7thの上に積むので、♭7thも一緒に入ります）';
+  return s;
+}
+
+// ============================================================
+// コード構成音の綴り（度数ベース）
+// ============================================================
+// コードの綴りは「キーの中で何度か」ではなく「そのコードの中で何度か」で決まる。
+// 例: Cdim の第3音は Cから数えて5番目の文字 G を半音下げた G♭ であって、
+//     F♯ ではない（F♯ と書くと4度に見えてしまい、和音の形が読めなくなる）。
+// キー基準の綴りだけで組み立てていたため、156通り中56通りで音程が読めない
+// 綴りになっていた（Cdim→C E♭ F♯ / Caug→C E A♭ / Dm7♭5→D F G♯ C）。
+
+/** コードタイプ → 各構成音の度数（CHORD_INTERVALS と同じ並び） */
+const CHORD_DEGREES = {
+  none: [1], major: [1, 3, 5], minor: [1, 3, 5], '7': [1, 3, 5, 7], maj7: [1, 3, 5, 7],
+  m7: [1, 3, 5, 7], m7b5: [1, 3, 5, 7], mmaj7: [1, 3, 5, 7], sus4: [1, 4, 5], sus2: [1, 2, 5],
+  '7sus4': [1, 4, 5, 7], dim: [1, 3, 5], dim7: [1, 3, 5, 7], aug: [1, 3, 5]
+};
+const TENSION_DEGREE = { add9: 9, '9': 9, '11': 11, '13': 13, '6': 6 };
+/** 度数 → メジャースケール上の半音数（度数ラベルの♯♭を決める基準） */
+const MAJOR_INTERVAL = { 1: 0, 2: 2, 3: 4, 4: 5, 5: 7, 6: 9, 7: 11, 9: 14, 11: 17, 13: 21 };
+
+const accSign = (a) => a > 0 ? '♯'.repeat(a) : a < 0 ? '♭'.repeat(-a) : '';
+
+/**
+ * コードの構成音を、度数にもとづいて綴る。
+ * @returns [{ pc, interval, name, degree, degreeLabel, simplified }]
+ *   name:        画面に出す音名（重変記号が要る音は読みやすい表記に落とす）
+ *   degreeLabel: '1' '♭3' '♭5' '♭♭7' など。落とした音でも理論上の度数はここに残る
+ *   simplified:  読みやすい表記に落としたかどうか
+ */
+export function chordSpelling(rootPc, type = 'major', tensions = [], keyPc = undefined) {
+  const k = keyPc ?? displayKeyPc;
+  const rootLi = LETTERS.indexOf(pcName(rootPc, k)[0]);
+  const ivs = CHORD_INTERVALS[type] || CHORD_INTERVALS.none;
+  const degs = CHORD_DEGREES[type] || CHORD_DEGREES.none;
+  const pairs = ivs.map((iv, i) => [iv, degs[i] ?? 1]);
+
+  // buildChord と同じ順序でテンションを足す（9th以上は7thの上に積む）
+  const has7 = ivs.some(i => i === 10 || i === 11);
+  for (const t of tensions) {
+    const def = TENSIONS[t];
+    if (!def) continue;
+    if (def.implies7 && !has7 && !pairs.some(([iv]) => iv === 10)) pairs.push([10, 7]);
+    if (!pairs.some(([iv]) => iv === def.interval)) pairs.push([def.interval, TENSION_DEGREE[t] ?? 9]);
+  }
+  pairs.sort((a, b) => a[0] - b[0]);
+
+  return pairs.map(([iv, deg]) => {
+    const pc = ((rootPc + iv) % 12 + 12) % 12;
+    const li = (rootLi + deg - 1) % 7;
+    let acc = ((pc - LETTER_PC[li]) % 12 + 12) % 12;
+    if (acc > 6) acc -= 12;
+    // 重変記号（B♭♭ など）が必要なら音名は読みやすい方に落とす。
+    // 理論上の度数は degreeLabel に残るので、情報は失われない。
+    const simplified = Math.abs(acc) > 1;
+    const name = simplified ? pcName(pc, k) : LETTERS[li] + accSign(acc);
+    const d = iv - (MAJOR_INTERVAL[deg] ?? 0);
+    return { pc, interval: iv, name, degree: deg, degreeLabel: accSign(d) + deg, simplified };
+  });
+}
+
+/** ピッチクラス → そのコードでの綴り、を引ける Map にする */
+export function chordSpellingMap(rootPc, type, tensions = [], keyPc = undefined) {
+  const m = new Map();
+  for (const s of chordSpelling(rootPc, type, tensions, keyPc)) {
+    if (!m.has(s.pc)) m.set(s.pc, s);
+  }
+  return m;
+}
+
+// 度数ラベル → 初心者向けの日本語。
+// 「♭7 と書くなら、なんで 6 じゃないの？」に答えるための説明文。
+// 度数は半音の数ではなく「ドレミファソラシの何番目か」なので、
+// 同じ鍵盤でも文字が違えば別の度数になる、という所を必ず言葉にする。
+const DEGREE_MEANING = {
+  '1':  'ルート。コードの土台になる音',
+  '2':  '2番目の音。sus2 の「ふわっと」を作る',
+  '♭3': '3番目の音を半音下げた音。マイナーの「せつなさ」の正体',
+  '3':  '3番目の音。メジャーの「あかるさ」の正体',
+  '4':  '4番目の音。sus4 の「決まりきらない感じ」を作る',
+  '♭5': '5番目の音を半音下げた音。安定を崩して不安にする',
+  '5':  '5番目の音。コードをどっしり安定させる',
+  '♯5': '5番目の音を半音上げた音。ふしぎな浮遊感が出る',
+  '6':  '6番目の音。やわらかくレトロな感じになる',
+  '♭7': '7番目の音を半音下げた音。次のコードへ進みたくなる力が出る',
+  '7':  '7番目の音。おしゃれで落ち着いた響きになる',
+  '♭♭7': '7番目の音を半音2つ下げた音。鍵盤は6番目と同じだが、7番目を下げたものとして数える',
+  '9':  '1オクターブ上の2番目の音。透明感が加わる',
+  '11': '1オクターブ上の4番目の音。浮遊感のある不思議さ',
+  '13': '1オクターブ上の6番目の音。大人っぽく豊かになる'
+};
+
+/** 度数ラベル（'♭3' など）→ 日本語の意味。未知のものは空文字 */
+export function degreeMeaning(label) {
+  return DEGREE_MEANING[label] ?? '';
+}
+
+/** 度数の並びをまとめて日本語にする（ツールチップ用） */
+export function degreeMeaningList(rootPc, type, tensions = [], keyPc = undefined) {
+  return chordSpelling(rootPc, type, tensions, keyPc)
+    .map(s => `${s.name}（${s.degreeLabel}）… ${degreeMeaning(s.degreeLabel)}`)
+    .join('\n');
 }

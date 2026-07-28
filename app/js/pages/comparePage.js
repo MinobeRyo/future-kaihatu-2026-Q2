@@ -4,7 +4,7 @@
 // 「テンポを止めずに」は簡易実装では次ループ開始時に切り替える方式にしている。
 // ========================================
 
-import { NOTE_LETTERS, buildChord, chordDisplayName } from '../core/musicTheory.js';
+import { NOTE_LETTERS, pcName, buildChord, chordDisplayName } from '../core/musicTheory.js';
 import { initAudio, loadInstrument, playTracks, stop } from '../core/audioEngine.js';
 import { PROGRESSION_PRESETS, presetToChords } from '../data/progressions.js';
 import { songsForPattern } from '../data/songs.js';
@@ -21,7 +21,7 @@ const activeLabel = document.getElementById('activeLabel');
 const cardA = document.getElementById('cardA');
 const cardB = document.getElementById('cardB');
 
-NOTE_LETTERS.forEach((n, i) => keySelect.appendChild(new Option(n, i)));
+NOTE_LETTERS.forEach((_, i) => keySelect.appendChild(new Option(pcName(i, i), i)));
 PROGRESSION_PRESETS.forEach(p => {
   presetASelect.appendChild(new Option(`${p.name}（${p.romanLabel}）`, p.id));
   presetBSelect.appendChild(new Option(`${p.name}（${p.romanLabel}）`, p.id));
@@ -114,3 +114,9 @@ switchBtn.addEventListener('click', () => {
 });
 
 bpmRange.addEventListener('input', () => { bpmLabel.textContent = bpmRange.value; });
+
+// 音名表記（♯/♭）が切り替わったら、キー選択肢とカードを描き直す
+document.addEventListener('notationchange', () => {
+  keySelect.querySelectorAll('option').forEach((o, i) => { o.textContent = pcName(i, i); });
+  renderBoth();
+});

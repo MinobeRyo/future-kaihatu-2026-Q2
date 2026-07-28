@@ -1,0 +1,1020 @@
+/* ============================================================
+   compose.css - 作曲モード v2（新デザイン「作曲融合案」の落とし込み）
+   このページ専用のスコープCSS。トークンは .cv2 配下に閉じ込め、
+   サイト共通の style.css（青系トークン）と衝突させない。
+   ダーク/ライトは html[data-theme] を見て切り替える（サイト共通の仕組みに合わせる）。
+   ============================================================ */
+
+/* ---- デザイントークン（暖色 oklch パレット） ---- */
+.cv2 {
+  --bg: oklch(0.975 0.008 70);
+  --panel: oklch(0.999 0.004 80);
+  --panel-2: oklch(0.955 0.011 66);
+  --text: oklch(0.28 0.013 55);
+  --muted: oklch(0.55 0.013 60);
+  --border: oklch(0.9 0.013 66);
+  --accent: oklch(0.66 0.15 32);
+  --accent-2: oklch(0.73 0.13 52);
+  --accent-ink: oklch(0.99 0.01 40);
+  --accent-soft: oklch(0.95 0.04 42);
+  --maj: oklch(0.7 0.15 42);
+  --min: oklch(0.62 0.12 300);
+  --dom: oklch(0.66 0.12 168);
+  --dim: oklch(0.56 0.08 315);
+  --mel: oklch(0.68 0.13 158);
+  --bass: oklch(0.74 0.13 74);
+  --shadow: 0 16px 40px rgba(72, 46, 36, .14);
+  --shadow-sm: 0 5px 14px rgba(72, 46, 36, .12);
+  --rowline: oklch(0.92 0.01 66);
+}
+
+html[data-theme="dark"] .cv2 {
+  --bg: oklch(0.21 0.013 50);
+  --panel: oklch(0.27 0.015 52);
+  --panel-2: oklch(0.31 0.015 52);
+  --text: oklch(0.95 0.006 80);
+  --muted: oklch(0.72 0.013 70);
+  --border: oklch(0.37 0.015 52);
+  --accent: oklch(0.73 0.15 34);
+  --accent-2: oklch(0.78 0.13 52);
+  --accent-ink: oklch(0.2 0.02 40);
+  --accent-soft: oklch(0.34 0.06 35);
+  --maj: oklch(0.72 0.15 46);
+  --min: oklch(0.66 0.12 300);
+  --mel: oklch(0.72 0.13 160);
+  --bass: oklch(0.78 0.13 76);
+  --shadow: 0 16px 44px rgba(0, 0, 0, .44);
+  --shadow-sm: 0 5px 16px rgba(0, 0, 0, .4);
+  --rowline: oklch(0.34 0.012 52);
+}
+
+/* ---- ページ全体 ---- */
+.cv2 {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(1200px 560px at 82% -10%, var(--accent-soft), transparent 62%),
+    var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+  transition: background .35s;
+}
+.cv2 *,
+.cv2 *::before,
+.cv2 *::after { box-sizing: border-box; }
+.cv2 .num { font-family: 'Outfit', -apple-system, sans-serif; }
+
+/* ---- ヘッダー ---- */
+.cv2-header {
+  flex: 0 0 auto;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  backdrop-filter: blur(10px);
+  background: color-mix(in oklch, var(--bg) 82%, transparent);
+  border-bottom: 1px solid var(--border);
+}
+.cv2-header-inner {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 11px 24px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.cv2-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--text);
+  text-decoration: none;
+}
+.cv2-brand .dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+}
+.cv2-nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+.cv2-nav a {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 6px 10px;
+  border-radius: 9px;
+}
+.cv2-nav a:hover { background: var(--panel-2); color: var(--text); }
+.cv2-nav a.active { background: var(--accent); color: var(--accent-ink); }
+
+.cv2-key {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cv2-key .lbl { font-size: 12px; color: var(--muted); font-weight: 700; }
+.cv2-key .stepper {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 4px;
+}
+.cv2-key .stepper button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 15px;
+  cursor: pointer;
+}
+.cv2-key .stepper button:hover { background: var(--panel-2); }
+.cv2-key .name {
+  min-width: 34px;
+  text-align: center;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text);
+}
+.cv2-theme {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 15px;
+}
+.cv2-theme:hover { border-color: var(--accent); }
+
+/* ---- メイン ---- */
+.cv2-main {
+  flex: 1;
+  max-width: 1120px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 22px 24px 148px;
+}
+.cv2-step {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.cv2-step .badge {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  color: #fff;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 800;
+  font-size: 13px;
+}
+.cv2-step .badge.b1 { background: var(--accent); color: var(--accent-ink); }
+.cv2-step .badge.b2 { background: var(--mel); }
+.cv2-step .title { font-weight: 700; font-size: 16px; }
+.cv2-step .desc { font-size: 12px; color: var(--muted); }
+
+.cv2-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  box-shadow: var(--shadow);
+  padding: 20px;
+  transition: background .35s;
+}
+.cv2-gap { margin-top: 26px; }
+
+/* ---- プリセットボタン ---- */
+.cv2-presets {
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.cv2-preset {
+  padding: 9px 15px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.cv2-preset:hover { border-color: var(--accent); }
+.cv2-preset.on { border-color: var(--accent); background: var(--accent-soft); }
+
+/* ---- コードカード ---- */
+.cv2-cards {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: stretch;
+}
+.cv2-card {
+  position: relative;
+  width: 116px;
+  min-height: 148px;
+  border-radius: 16px;
+  padding: 12px 13px;
+  cursor: pointer;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-sm);
+  border: 2px solid transparent;
+  transition: transform .12s, border-color .12s;
+  animation: noteIn .22s ease both;
+}
+.cv2-card:hover { transform: translateY(-2px); }
+.cv2-card.sel { border-color: #fff; box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 55%, transparent), var(--shadow-sm); }
+.cv2-card .top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.cv2-card .deg {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 700;
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, .88);
+}
+.cv2-card .rm {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  border: none;
+  background: rgba(0, 0, 0, .16);
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+.cv2-card .rm:hover { background: rgba(0, 0, 0, .3); }
+.cv2-card .name {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 800;
+  font-size: 30px;
+  line-height: 1;
+  margin: 10px 0 4px;
+  word-break: break-all;
+}
+.cv2-card .feel { font-size: 12px; color: rgba(255, 255, 255, .95); font-weight: 700; }
+.cv2-card .notes { margin-top: 3px; font-size: 11px; color: rgba(255, 255, 255, .82); }
+
+/* カラー（クオリティ別） */
+.cv2-card.q-maj { background: var(--maj); }
+.cv2-card.q-min { background: var(--min); }
+.cv2-card.q-dom { background: var(--dom); }
+.cv2-card.q-dim { background: var(--dim); }
+
+/* ＋足す */
+.cv2-addwrap { position: relative; }
+.cv2-add {
+  width: 92px;
+  min-height: 148px;
+  border-radius: 16px;
+  border: 2px dashed var(--border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-family: inherit;
+}
+.cv2-add:hover { border-color: var(--accent); color: var(--accent); }
+.cv2-add .plus { font-size: 26px; }
+.cv2-add .txt { font-size: 12px; font-weight: 700; }
+
+.cv2-add.on { border-color: var(--accent); color: var(--accent); border-style: solid; }
+
+.cv2-palette {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 10px;
+  z-index: 20;
+  width: 356px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 14px;
+  animation: popIn .2s ease both;
+}
+/* パレットの分類タブ（きほん / 7th / いろどり / スパイス） */
+.cv2-palette .tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--panel-2);
+  margin-bottom: 10px;
+}
+.cv2-palette .tabs button {
+  flex: 1;
+  padding: 7px 4px;
+  border-radius: 9px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+}
+.cv2-palette .tabs button:hover { color: var(--accent); }
+.cv2-palette .tabs button.on { background: var(--accent); color: var(--accent-ink); }
+.cv2-palette .cap { font-size: 11.5px; color: var(--muted); font-weight: 700; margin-bottom: 9px; line-height: 1.5; }
+.cv2-palette .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+.cv2-palette .grid button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 4px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  color: #fff;
+  font-family: 'Outfit', sans-serif;
+}
+.cv2-palette .grid button .nm { font-weight: 800; font-size: 15px; }
+.cv2-palette .grid button .dg { font-size: 10px; opacity: .85; font-weight: 600; }
+.cv2-palette .grid button:hover { filter: brightness(1.08); }
+.cv2-palette .tip {
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px dashed var(--border);
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--muted);
+  min-height: 32px;
+}
+
+/* 選択コードの操作行（7th/9th） */
+.cv2-selrow {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--border);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  animation: sheetUp .25s ease both;
+}
+.cv2-selrow .lbl { font-size: 12.5px; font-weight: 700; }
+.cv2-tog {
+  padding: 9px 13px;
+  border-radius: 11px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.cv2-tog small { font-size: 11px; opacity: .75; margin-left: 3px; }
+.cv2-tog:hover { border-color: var(--accent); }
+.cv2-tog.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.cv2-del {
+  padding: 9px 14px;
+  border-radius: 11px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.cv2-del:hover { border-color: var(--accent); color: var(--accent); }
+.cv2-spacer { flex: 1; }
+
+/* 逆引き診断 */
+.cv2-diag { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--border); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.cv2-diag button {
+  padding: 8px 14px;
+  border-radius: 11px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.cv2-diag button:hover { border-color: var(--accent); color: var(--accent); }
+.cv2-diag .result { font-size: 12.5px; color: var(--accent); font-weight: 700; }
+
+/* ---- STEP2 レイヤー切り替え ---- */
+.cv2-layerbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px dashed var(--border);
+}
+.cv2-layerbar .lbl { font-size: 12.5px; font-weight: 700; color: var(--muted); }
+.cv2-layertabs { display: flex; gap: 6px; }
+.cv2-layertab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 15px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--muted);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 13.5px;
+  cursor: pointer;
+  transition: transform .12s, border-color .12s;
+}
+.cv2-layertab .ic { font-size: 14px; }
+.cv2-layertab small { font-size: 10.5px; opacity: .7; font-weight: 600; }
+.cv2-layertab:hover { transform: translateY(-1px); border-color: var(--accent); }
+.cv2-layertab.l-melody.on { background: var(--mel); border-color: var(--mel); color: #fff; }
+.cv2-layertab.l-bass.on { background: var(--bass); border-color: var(--bass); color: #fff; }
+.cv2-layertab.on small { opacity: .9; }
+
+.cv2-bassmode { display: inline-flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.cv2-bassmode .tag {
+  padding: 5px 10px;
+  border-radius: 9px;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+.cv2-bassmode .tag.auto { background: color-mix(in oklch, var(--bass) 22%, transparent); color: var(--text); }
+.cv2-bassmode .tag.manual { background: color-mix(in oklch, var(--accent) 22%, transparent); color: var(--text); }
+.cv2-bassmode .note { font-size: 11px; color: var(--muted); }
+.cv2-bassmode button {
+  padding: 6px 12px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.cv2-bassmode button:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ---- STEP2 メロディ ---- */
+.cv2-melbtns { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.cv2-styles { display: inline-flex; align-items: center; gap: 9px; }
+.cv2-styles .lbl { font-size: 11.5px; color: var(--muted); font-weight: 700; }
+.cv2-styles .tabs { display: flex; gap: 4px; padding: 4px; border-radius: 12px; background: var(--panel-2); }
+.cv2-styles .tabs button {
+  padding: 7px 12px;
+  border-radius: 9px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+}
+.cv2-styles .tabs button:hover { color: var(--accent); }
+.cv2-styles .tabs button.on { background: var(--mel); color: #fff; }
+.cv2-styledesc { font-size: 11.5px; color: var(--muted); margin-bottom: 14px; line-height: 1.55; }
+
+/* ---- 提案パネル（次の音 / 次のコード 共通） ---- */
+.cv2-suggest {
+  padding: 14px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  margin-bottom: 16px;
+}
+.cv2-suggest-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 11px; }
+.cv2-suggest-head .t { font-size: 12.5px; font-weight: 700; }
+.cv2-suggest-head .sub { font-size: 11.5px; color: var(--muted); font-weight: 700; }
+.cv2-suggest-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+  gap: 9px;
+}
+.cv2-suggest-empty { font-size: 12px; color: var(--muted); padding: 6px 2px; }
+.cv2-suggest-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  padding: 12px 13px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--muted);
+  background: var(--panel);
+  color: var(--text);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform .12s, border-color .12s, box-shadow .12s;
+}
+.cv2-suggest-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-sm); }
+.cv2-suggest-card .role { font-size: 11.5px; font-weight: 700; color: var(--muted); }
+.cv2-suggest-card .pitch {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+.cv2-suggest-card .pitch small {
+  font-family: 'Outfit', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.cv2-suggest-card .hint { font-size: 11px; line-height: 1.5; color: var(--muted); }
+.cv2-suggest-card .tagline {
+  margin-top: 2px;
+  padding: 3px 8px;
+  border-radius: 7px;
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--panel-2);
+  color: var(--muted);
+}
+/* 役割ごとの色 */
+.cv2-suggest-card.r-lift { border-left-color: var(--accent); }
+.cv2-suggest-card.r-lift .role { color: var(--accent); }
+.cv2-suggest-card.r-settle { border-left-color: var(--mel); }
+.cv2-suggest-card.r-settle .role { color: var(--mel); }
+.cv2-suggest-card.r-step { border-left-color: var(--bass); }
+.cv2-suggest-card.r-step .role { color: var(--bass); }
+.cv2-suggest-card.r-color { border-left-color: var(--min); }
+.cv2-suggest-card.r-color .role { color: var(--min); }
+.cv2-suggest-card.r-flow { border-left-color: var(--dom); }
+.cv2-suggest-card.r-flow .role { color: var(--dom); }
+
+/* コード提案はコード名が長いので少し幅を広めに、文字は小さめに */
+.cv2-suggest-chord { margin-top: 16px; margin-bottom: 0; }
+.cv2-suggest-chord .cv2-suggest-grid { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.cv2-suggest-chord .cv2-suggest-card .pitch { font-size: 20px; font-family: 'Outfit', sans-serif; }
+
+.cv2-auto {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 20px;
+  border-radius: 14px;
+  border: none;
+  background: linear-gradient(135deg, var(--mel), oklch(0.7 0.13 130));
+  color: #fff;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+  box-shadow: 0 8px 20px color-mix(in oklch, var(--mel) 32%, transparent);
+  transition: transform .12s;
+}
+.cv2-auto:hover { transform: translateY(-2px); }
+.cv2-ghostbtn {
+  padding: 12px 18px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--muted);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+}
+.cv2-ghostbtn:hover { border-color: var(--accent); color: var(--accent); }
+
+.cv2-doremi-box {
+  padding: 14px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  margin-bottom: 16px;
+}
+.cv2-doremi-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 11px;
+  flex-wrap: wrap;
+}
+.cv2-doremi-head .t { font-size: 12.5px; font-weight: 700; }
+.cv2-doremi-head .hint { font-size: 11.5px; color: var(--mel); font-weight: 700; }
+.cv2-doremi-head .len-lbl { font-size: 11.5px; color: var(--muted); font-weight: 700; }
+.cv2-lentabs { display: flex; gap: 5px; }
+.cv2-lentab {
+  padding: 6px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--muted);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+}
+.cv2-lentab.on { background: var(--mel); border-color: var(--mel); color: #fff; }
+
+.cv2-doremi { display: flex; gap: 8px; flex-wrap: wrap; }
+.cv2-note-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 52px;
+  padding: 11px 8px;
+  border-radius: 13px;
+  border: 1.5px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color .12s, box-shadow .12s;
+}
+.cv2-note-btn .lab { font-size: 17px; font-weight: 700; }
+.cv2-note-btn .sub { font-size: 10px; opacity: .75; font-family: 'Outfit', sans-serif; }
+.cv2-note-btn:hover { border-color: var(--accent); }
+.cv2-note-btn.fit {
+  border-color: var(--mel);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--mel) 30%, transparent);
+}
+.cv2-note-btn.util { color: var(--muted); }
+
+/* ---- ピアノロール ---- */
+.cv2-roll-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.cv2-roll-head .t { font-size: 13px; font-weight: 700; }
+.cv2-roll-head .t small { color: var(--muted); font-weight: 500; font-size: 11.5px; }
+.cv2-legend { display: flex; align-items: center; gap: 14px; }
+.cv2-legend span { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+.cv2-legend .sw { width: 11px; height: 11px; border-radius: 3px; }
+
+.cv2-roll {
+  display: flex;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--panel-2);
+}
+.cv2-roll-labels { flex: 0 0 52px; position: relative; }
+.cv2-roll-label {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 8px;
+  font-size: 10px;
+  color: var(--muted);
+  font-family: 'Outfit', sans-serif;
+}
+.cv2-roll-scroll { flex: 1; overflow-x: auto; }
+.cv2-roll-beatnums { position: relative; height: 20px; }
+.cv2-roll-beatnum {
+  position: absolute;
+  top: 3px;
+  font-size: 10px;
+  color: var(--muted);
+  font-family: 'Outfit', sans-serif;
+  transform: translateX(-50%);
+}
+.cv2-roll-regions { position: relative; height: 22px; margin-bottom: 2px; }
+.cv2-roll-region {
+  position: absolute;
+  top: 0;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  border-radius: 6px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.cv2-roll-grid {
+  position: relative;
+  cursor: crosshair;
+}
+.cv2-roll-rowline { position: absolute; left: 0; right: 0; height: 1px; background: var(--rowline); }
+.cv2-roll-rowfill { position: absolute; left: 0; right: 0; background: color-mix(in oklch, var(--panel) 45%, transparent); }
+.cv2-roll-beatline { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--rowline); }
+.cv2-roll-beatline.bar { background: var(--border); }
+
+.cv2-roll-block {
+  position: absolute;
+  border-radius: 5px;
+  opacity: .9;
+}
+.cv2-roll-block.chord { background: var(--maj); }
+.cv2-roll-block.chord.minq { background: var(--min); }
+.cv2-roll-block.bass { background: var(--bass); }
+
+/* メロディ・ベースのノート。アクティブなレイヤーだけ操作でき、
+   非アクティブは薄く沈めて「今どっちを編集しているか」を見た目で示す。 */
+.cv2-roll-note {
+  position: absolute;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  padding-left: 6px;
+  animation: noteIn .18s ease both;
+}
+.cv2-roll-note.melody { background: var(--mel); }
+.cv2-roll-note.bass { background: var(--bass); }
+.cv2-roll-note.active {
+  cursor: grab;
+  box-shadow: 0 2px 6px color-mix(in oklch, var(--mel) 40%, transparent);
+}
+.cv2-roll-note.bass.active { box-shadow: 0 2px 6px color-mix(in oklch, var(--bass) 40%, transparent); }
+.cv2-roll-note.dim {
+  opacity: .34;
+  pointer-events: none;
+  filter: saturate(.6);
+}
+.cv2-roll-note.sel { outline: 2px solid #fff; outline-offset: -2px; z-index: 5; }
+.cv2-roll-note .lab { pointer-events: none; font-size: 11px; font-weight: 700; color: #fff; }
+.cv2-roll-note .handle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: ew-resize;
+  border-radius: 0 6px 6px 0;
+  background: rgba(255, 255, 255, .25);
+}
+.cv2-roll-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+  pointer-events: none;
+}
+
+/* 選択中メロディの操作行 */
+.cv2-melsel {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  animation: sheetUp .25s ease both;
+}
+.cv2-melsel .lbl { font-size: 12.5px; color: var(--muted); font-weight: 700; }
+.cv2-melsel button {
+  padding: 9px 13px;
+  border-radius: 11px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.cv2-melsel button:hover { border-color: var(--accent); }
+.cv2-melsel button.del { background: transparent; color: var(--muted); }
+.cv2-melsel button.del:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ---- フッター（再生バー） ---- */
+.cv2-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  backdrop-filter: blur(12px);
+  background: color-mix(in oklch, var(--panel) 90%, transparent);
+  border-top: 1px solid var(--border);
+}
+.cv2-footer-inner {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.cv2-play {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 22px;
+  border-radius: 14px;
+  border: none;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: var(--accent-ink);
+  font-family: inherit;
+  font-weight: 800;
+  font-size: 15px;
+  cursor: pointer;
+  box-shadow: 0 8px 20px color-mix(in oklch, var(--accent) 34%, transparent);
+}
+.cv2-play:hover { filter: brightness(1.05); }
+.cv2-play.playing { background: var(--panel-2); color: var(--text); box-shadow: none; border: 1px solid var(--border); }
+.cv2-bpm { display: flex; align-items: center; gap: 10px; }
+.cv2-bpm .lbl { font-size: 12px; color: var(--muted); font-weight: 700; white-space: nowrap; }
+.cv2-bpm input { width: 120px; accent-color: var(--accent); cursor: pointer; }
+.cv2-loop {
+  padding: 10px 15px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--muted);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+.cv2-loop:hover { border-color: var(--accent); }
+.cv2-loop.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.cv2-inst { display: flex; align-items: center; gap: 9px; }
+.cv2-inst .lbl { font-size: 12px; color: var(--muted); font-weight: 700; }
+.cv2-inst .tabs { display: flex; gap: 5px; }
+.cv2-inst .tabs button {
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--muted);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+}
+.cv2-inst .tabs button.on { background: var(--accent-2); border-color: var(--accent-2); color: #fff; }
+
+/* ---- keyframes ---- */
+@keyframes sheetUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+@keyframes popIn { from { opacity: 0; transform: translateY(-6px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes noteIn { 0% { opacity: 0; transform: scale(.85); } 100% { opacity: 1; transform: none; } }
+
+@media (max-width: 720px) {
+  .cv2-nav { display: none; }
+  .cv2-main { padding: 18px 14px 160px; }
+}
+
+/* ---- 「両方」モードで添える別表記 ---- */
+.alt {
+  margin-left: 5px;
+  font-size: .62em;
+  font-weight: 600;
+  opacity: .62;
+  white-space: nowrap;
+}
+.alt::before { content: '('; }
+.alt::after { content: ')'; }
+
+/* ---- パレット「くわしく」: 自由組み立て ---- */
+.cv2-palette.wide { width: 430px; }
+.cv2-custom-sec { margin-bottom: 10px; }
+.cv2-custom-sec .lb {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 5px;
+}
+.cv2-custom .row { display: flex; flex-wrap: wrap; gap: 4px; }
+.cv2-custom .row.roots { display: grid; grid-template-columns: repeat(6, 1fr); }
+.cv2-custom .chip {
+  padding: 7px 9px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 12.5px;
+  line-height: 1.25;
+  cursor: pointer;
+  transition: border-color .12s, background .12s;
+}
+.cv2-custom .chip.black { background: color-mix(in oklch, var(--text) 9%, var(--panel-2)); }
+.cv2-custom .chip:hover { border-color: var(--accent); }
+.cv2-custom .chip.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.cv2-custom .chip .alt { opacity: .7; }
+
+.cv2-custom-preview {
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px dashed var(--border);
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  flex-wrap: wrap;
+}
+.cv2-custom-preview .nm {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 800;
+  font-size: 24px;
+  line-height: 1.1;
+}
+.cv2-custom-preview .notes { font-size: 11.5px; color: var(--muted); }
+.cv2-custom-add {
+  margin-left: auto;
+  padding: 9px 15px;
+  border-radius: 11px;
+  border: none;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+.cv2-custom-add:hover { filter: brightness(1.06); }
+
+/* 構成音の度数（1・♭3・♭5）。なぜその綴りになるかを示す */
+.cv2-card .degs {
+  margin-top: 2px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 10.5px;
+  letter-spacing: .02em;
+  color: rgba(255, 255, 255, .68);
+}
+.cv2-custom-preview .notes .degs {
+  display: block;
+  margin-top: 2px;
+  font-family: 'Outfit', sans-serif;
+  opacity: .75;
+}
+
+/* 度数の読み方（たたんでおける説明） */
+.cv2-degnote {
+  margin-top: 14px;
+  padding: 10px 13px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  background: var(--panel-2);
+  font-size: 11.5px;
+  line-height: 1.65;
+  color: var(--muted);
+}
+.cv2-degnote summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--text);
+  font-size: 12px;
+  list-style: none;
+}
+.cv2-degnote summary::-webkit-details-marker { display: none; }
+.cv2-degnote summary::before { content: '？ '; color: var(--accent); font-weight: 800; }
+.cv2-degnote[open] summary { margin-bottom: 7px; }
+.cv2-degnote p { margin: 0 0 6px; }
+.cv2-degnote p:last-child { margin-bottom: 0; }
+.cv2-degnote b { color: var(--text); }
+.cv2-card .degs { cursor: help; }

@@ -14,6 +14,15 @@ import {
 } from '../js/core/timeline.js';
 import { findSimilarProgressions, matchMessage, songsForPattern } from '../js/data/songs.js';
 import { getMagicCircleRootRadius } from '../js/ui/magicCircle.js';
+import { PALETTE_TABS, paletteChords } from '../js/data/chordPalette.js';
+import { MELODY_STYLES, generateMelody } from '../js/core/melodyGen.js';
+import { suggestMelodyNotes, suggestBassNotes, suggestNextChords, doremiOf } from '../js/core/suggest.js';
+import { RING_MODES, ringModeOf, noteDuration } from '../js/core/audioEngine.js';
+import {
+  pcName, pcAltName, midiDisplayName, setNotation, getNotation, setDisplayKey,
+  NOTATION_MODES, chordAltName, chordBreakdown, solfegeName, CHORD_TYPE_LABELS,
+  chordSpelling, chordSpellingMap, CHORD_INTERVALS
+} from '../js/core/musicTheory.js';
 
 let pass = 0, fail = 0;
 function check(name, actual, expected) {
@@ -92,7 +101,7 @@ const oudou = PROGRESSION_PRESETS.find(p => p.id === 'oudou');
 const oudouInC = presetToChords(oudou, 0);
 check('王道進行 Key=C', oudouInC.map(c => chordDisplayName(c.rootPc, c.type)), ['F', 'G', 'Em', 'Am']);
 const oudouInD = presetToChords(oudou, 2); // 移調（トランスポーズ）
-check('王道進行 Key=D', oudouInD.map(c => chordDisplayName(c.rootPc, c.type)), ['G', 'A', 'F#m', 'Bm']);
+check('王道進行 Key=D', oudouInD.map(c => chordDisplayName(c.rootPc, c.type)), ['G', 'A', 'F♯m', 'Bm']);
 
 console.log('--- 移調 ---');
 check('移調(+2)がプリセットKey=Dと一致',
@@ -147,6 +156,391 @@ check('空タイムラインの表示範囲はC3〜B5', [emptyRange.low, emptyRa
 
 console.log('--- 楽曲DB ---');
 check('丸サ進行の紐付け楽曲数', songsForPattern('marusa').length, 3);
+
+// ============================================================
+// コードパレット（タブ式）
+// ============================================================
+console.log('--- コードパレット ---');
+check('タブは5分類（自由組み立ての「くわしく」を含む）', PALETTE_TABS.map(t => t.id),
+  ['diatonic', 'seventh', 'color', 'spice', 'custom']);
+check('きほんはダイアトニック7個', paletteChords('diatonic', 0).map(c => chordDisplayName(c.rootPc, c.type)),
+  ['C', 'Dm', 'Em', 'F', 'G', 'Am', 'Bdim']);
+check('7thタブのVは属七（G7）', chordDisplayName(...pick(paletteChords('seventh', 0), 4)), 'G7');
+check('スパイスにセカンダリドミナントD7がある',
+  paletteChords('spice', 0).some(c => c.rootPc === 2 && c.type === '7'), true);
+check('スパイスに借用和音Fm（IVm）がある',
+  paletteChords('spice', 0).some(c => c.rootPc === 5 && c.type === 'minor'), true);
+check('キーGでも表がずれない（IVはC）', chordDisplayName(...pick(paletteChords('diatonic', 7), 3)), 'C');
+check('全タブのrootPcが0-11に収まる',
+  PALETTE_TABS.every(t => paletteChords(t.id, 11).every(c => c.rootPc >= 0 && c.rootPc < 12)), true);
+function pick(list, i) { return [list[i].rootPc, list[i].type]; }
+
+// ============================================================
+// おまかせメロディ生成
+// ============================================================
+console.log('--- おまかせメロディ ---');
+const prog = [
+  { rootPc: 5, type: 'major', startCount: 0, lengthCount: 2 },   // F
+  { rootPc: 7, type: 'major', startCount: 2, lengthCount: 2 },   // G
+  { rootPc: 4, type: 'minor', startCount: 4, lengthCount: 2 },   // Em
+  { rootPc: 9, type: 'minor', startCount: 6, lengthCount: 2 }    // Am
+];
+const MEL_RANGE = { low: 64, high: 86 };
+check('スタイルは4種類', MELODY_STYLES.map(s => s.id), ['repeat', 'arc', 'smooth', 'rhythmic']);
+check('コードが空なら空配列', generateMelody({ chords: [], keyPc: 0 }), []);
+
+for (const s of MELODY_STYLES) {
+  const runs = Array.from({ length: 30 }, () =>
+    generateMelody({ chords: prog, keyPc: 0, style: s.id, range: MEL_RANGE }));
+  check(`${s.label}: 音が生成される`, runs.every(r => r.length > 0), true);
+  check(`${s.label}: 進行の長さ(8カウント)を超えない`,
+    runs.every(r => r.every(n => n.startCount + n.lengthCount <= 8.001)), true);
+  check(`${s.label}: 開始位置が時系列順`,
+    runs.every(r => r.every((n, i) => i === 0 || n.startCount >= r[i - 1].startCount)), true);
+  check(`${s.label}: 音域からはみ出さない`,
+    runs.every(r => r.every(n => {
+      const m = n.rootPc + 12 * (n.octave + 1);
+      return m >= MEL_RANGE.low - 4 && m <= MEL_RANGE.high + 4;
+    })), true);
+  check(`${s.label}: 最後はキーのトニックに着地する`,
+    runs.every(r => r[r.length - 1].rootPc === 0), true);
+  check(`${s.label}: 押すたび結果が変わる（乱数が効いている）`,
+    new Set(runs.map(r => JSON.stringify(r))).size > 1, true);
+  check(`${s.label}: リズムに長短の変化がある`,
+    runs.some(r => new Set(r.map(n => n.lengthCount)).size > 1), true);
+}
+
+// ============================================================
+// 次の音の提案
+// ============================================================
+console.log('--- 次の音の提案 ---');
+// カーソル=2カウント目（Gコード上）、直前の音はC5(72)
+const sg = suggestMelodyNotes({ chords: prog, keyPc: 0, cursorCount: 2, prevMidi: 72, range: MEL_RANGE });
+check('メロディは4つの役割を提案する', sg.map(s => s.role), ['lift', 'settle', 'step', 'color']);
+check('提案が重複しない', new Set(sg.map(s => s.midi)).size, 4);
+check('「盛り上げ」は直前より高い', sg.find(s => s.role === 'lift').midi > 72, true);
+check('「締め」はキーのトニック', sg.find(s => s.role === 'settle').midi % 12, 0);
+check('「なめらか」は全音以内の動き', Math.abs(sg.find(s => s.role === 'step').midi - 72) <= 2, true);
+check('「意外性」はコード構成音ではない', sg.find(s => s.role === 'color').isChordTone, false);
+check('直前の音が無くても提案できる',
+  suggestMelodyNotes({ chords: prog, keyPc: 0, cursorCount: 0, prevMidi: null }).length, 4);
+check('コードが無ければ提案しない', suggestMelodyNotes({ chords: [], keyPc: 0 }), []);
+check('ドレミ表記（キーC のG）', doremiOf(7, 0), 'ソ');
+check('ドレミ表記（キーG のG＝ド）', doremiOf(7, 7), 'ド');
+check('キー外の音にはドレミが付かない', doremiOf(6, 0), null);
+
+const BASS_RANGE = { low: 40, high: 60 };
+const sb = suggestBassNotes({ chords: prog, keyPc: 0, cursorCount: 2, prevMidi: 48, range: BASS_RANGE });
+check('ベースは「安定＝ルート」を提案する', sb.find(s => s.role === 'settle').midi % 12, 7); // Gコードのルート
+check('ベースは次コードへのアプローチ音を提案する',
+  sb.find(s => s.role === 'color').midi % 12, 3); // 次はEm → Eの半音下 = D#
+check('ベース提案が音域内', sb.every(s => s.midi >= BASS_RANGE.low && s.midi <= BASS_RANGE.high), true);
+check('最後のコード上ではアプローチ音を出さない',
+  suggestBassNotes({ chords: prog, keyPc: 0, cursorCount: 6, prevMidi: 48, range: BASS_RANGE })
+    .some(s => s.role === 'color'), false);
+
+// ============================================================
+// 次のコードの提案
+// ============================================================
+console.log('--- 次のコードの提案 ---');
+const cAt = (rootPc, type, i) => ({ rootPc, type, startCount: i * 2, lengthCount: 2 });
+const nameOf = (s) => s.name;
+const roleOf = (list, role) => list.find(s => s.role === role);
+
+const start = suggestNextChords({ chords: [], keyPc: 0 });
+check('コードが無いときは出だしを4つ提案', start.length, 4);
+check('出だしの第一候補はI（C）', start[0].name, 'C');
+
+// C（I）のあと
+const afterI = suggestNextChords({ chords: [cAt(0, 'major', 0)], keyPc: 0 });
+check('Iの4役割がそろう', afterI.map(s => s.role), ['flow', 'lift', 'settle', 'color']);
+check('I → 自然につなぐのはIV（F）', roleOf(afterI, 'flow').name, 'F');
+check('I → 盛り上げはV7（G7）', roleOf(afterI, 'lift').name, 'G7');
+check('I → 意外性は借用のIVm（Fm）', roleOf(afterI, 'color').name, 'Fm');
+check('提案が重複しない', new Set(afterI.map(s => s.name)).size, 4);
+// 「締め」の第1候補IVは flow に取られるので VIm へ繰り下がる。
+// このとき説明文も繰り下がった側に合っていること（説明と実物の食い違い防止）
+check('I → 締めは重複を避けてVImに繰り下がる', roleOf(afterI, 'settle').degree, 'VIm');
+check('繰り下がっても説明文が実際のコードと一致する',
+  roleOf(afterI, 'settle').hint.startsWith('VIm'), true);
+
+// --- 提案ボタンを押し続けたときの堂々めぐり対策 ---
+// ①「今鳴っているコード」をそのまま次に出さない
+//    （Cのあとに Cmaj7 を出す等。7th/9thはカード側のトグルで足す導線がある）
+check('今と同じルートのコードは提案しない',
+  suggestNextChords({ chords: [cAt(5, 'minor', 0)], keyPc: 0 })
+    .every(s => s.rootPc !== 5), true);
+// ② A-B-A ときたあとに B を出すと A-B-A-B の往復になるので避ける
+check('A-B-A のあとに B を出して往復しない',
+  suggestNextChords({ chords: [cAt(7, 'major', 0), cAt(9, 'minor', 1), cAt(7, 'major', 2)], keyPc: 0 })
+    .every(s => !(s.rootPc === 9 && s.type === 'minor')), true);
+
+// 出発点と役割の全組み合わせで、押し続けても行き止まり・往復にならないこと
+let deadEnd = 0, pingPong = 0, repeatSame = 0;
+for (const startPc of [0, 2, 4, 5, 7, 9]) {
+  for (const startType of ['major', 'minor', '7', 'maj7']) {
+    for (const role of ['flow', 'lift', 'settle', 'color']) {
+      const seq = [{ rootPc: startPc, type: startType, startCount: 0, lengthCount: 2 }];
+      for (let i = 0; i < 12; i++) {
+        const s = roleOf(suggestNextChords({ chords: seq, keyPc: 0 }), role);
+        if (!s) { deadEnd++; break; }
+        seq.push({ rootPc: s.rootPc, type: s.type, startCount: seq.length * 2, lengthCount: 2 });
+      }
+      for (let i = 1; i < seq.length; i++) {
+        if (seq[i].rootPc === seq[i - 1].rootPc) { repeatSame++; break; }
+      }
+      for (let i = 3; i < seq.length; i++) {
+        const [a, b, c, d2] = [seq[i - 3], seq[i - 2], seq[i - 1], seq[i]];
+        if (a.rootPc === c.rootPc && a.type === c.type &&
+            b.rootPc === d2.rootPc && b.type === d2.type) { pingPong++; break; }
+      }
+    }
+  }
+}
+check('96パターン×12回押しても候補が尽きない', deadEnd, 0);
+check('96パターン×12回押しても同じコードが連続しない', repeatSame, 0);
+check('96パターン×12回押しても2つの間で往復しない', pingPong, 0);
+
+// G（V）のあと：偽終止を提案できるか
+const afterV = suggestNextChords({ chords: [cAt(7, 'major', 0)], keyPc: 0 });
+check('V → 自然につなぐのはI（C）', roleOf(afterV, 'flow').name, 'C');
+check('V → 盛り上げは偽終止のVIm（Am）', roleOf(afterV, 'lift').name, 'Am');
+
+// セカンダリドミナント E7 のあと：4度上の Am へ解決するか
+const afterE7 = suggestNextChords({ chords: [cAt(4, '7', 0)], keyPc: 0 });
+check('E7 → 4度上のAmへ解決を提案', roleOf(afterE7, 'flow').name, 'Am');
+check('E7 の解決の説明にドミナント7thと出る',
+  roleOf(afterE7, 'flow').hint.includes('ドミナント7th'), true);
+const afterD7 = suggestNextChords({ chords: [cAt(2, '7', 0)], keyPc: 0 });
+check('D7 → 4度上のG（V）へ解決を提案', roleOf(afterD7, 'flow').name, 'G');
+
+// キーを変えても度数関係が保たれる
+const inG = suggestNextChords({ chords: [cAt(7, 'major', 0)], keyPc: 7 }); // キーG の I=G
+check('キーGでも I → IV（C）', roleOf(inG, 'flow').name, 'C');
+check('キーGでも 盛り上げはV7（D7）', roleOf(inG, 'lift').name, 'D7');
+
+// 王道進行の途中
+const afterFGEm = suggestNextChords({
+  chords: [cAt(5, 'major', 0), cAt(7, 'major', 1), cAt(4, 'minor', 2)], keyPc: 0
+});
+check('IIImのあとはVIm（Am）へ', roleOf(afterFGEm, 'flow').name, 'Am');
+check('すべての提案に度数表記がある', afterFGEm.every(s => s.degree && s.name), true);
+
+// ============================================================
+// 音の「のび」（再生エンジン）
+// ============================================================
+console.log('--- 音ののび ---');
+check('のびは3段階', RING_MODES.map(r => r.id), ['short', 'normal', 'long']);
+check('既定（ふつう）の余韻は0.3秒より長い', ringModeOf('normal').release > 0.3, true);
+check('のばすは、ふつうより余韻が長い',
+  ringModeOf('long').release > ringModeOf('normal').release, true);
+check('未知のIDはふつうにフォールバック', ringModeOf('なにこれ').id, 'normal');
+// BPM100・2カウント = 1.2秒ぶんの発音（ふつう＝等倍＋わずかな重なり）
+check('ふつう: 2カウント@BPM100 は約1.3秒', Math.round(noteDuration(2, 100, 'normal') * 100) / 100, 1.3);
+check('みじかく: 同じ音符でも短くなる', noteDuration(2, 100, 'short') < noteDuration(2, 100, 'normal'), true);
+check('音符が長いほど発音も長い', noteDuration(4, 100, 'normal') > noteDuration(1, 100, 'normal'), true);
+check('BPMが速いほど発音は短い', noteDuration(2, 160, 'normal') < noteDuration(2, 60, 'normal'), true);
+check('発音秒数は必ず正', noteDuration(0, 100, 'short') > 0, true);
+
+
+// ============================================================
+// 音名の表記（♯/♭の綴り分け）
+// ============================================================
+console.log('--- 音名の表記 ---');
+check('モードは4種類', NOTATION_MODES.map(m => m.id), ['auto', 'sharp', 'flat', 'both']);
+
+setNotation('auto');
+// 自動モード：キーの中で何度の音かで綴りが決まる
+check('キーC の b6 は A♭', pcName(8, 0), 'A♭');
+check('キーE の #5 は G♯（同じ音でもキーで変わる）', pcName(8, 4), 'G♯');
+check('キーC の #4 は F♯', pcName(6, 0), 'F♯');
+check('キーF の b7 は B♭', pcName(10, 5), 'B♭');
+check('キーD♭ の #4 は G♭', pcName(6, 1), 'G♭');
+
+// 各キーのメジャースケールが「7文字が1回ずつ」になること（＝綴りが理論的に正しい）
+const MAJOR = [0, 2, 4, 5, 7, 9, 11];
+let scaleNg = [];
+for (let k = 0; k < 12; k++) {
+  const letters = MAJOR.map(o => pcName((k + o) % 12, k)[0]);
+  if (new Set(letters).size !== 7) scaleNg.push(k);
+}
+// G♭/F♯ キー(pc=6)だけは例外。理論上は C♭（または E♯）が要るが、
+// 初心者向けなので白鍵は素直に B（F）と表記する方を優先している。意図的な割り切り。
+check('G♭/F♯キー以外は音名の文字が重複しない', scaleNg, [6]);
+// 重変記号（♯♯ / ♭♭）が出ないこと
+let heavy = [];
+for (let k = 0; k < 12; k++) {
+  for (let pc = 0; pc < 12; pc++) {
+    const n = pcName(pc, k);
+    if (n.length > 2) heavy.push(`key${k}:pc${pc}=${n}`);
+  }
+}
+check('全144通りで重変記号が出ない', heavy, []);
+
+// 固定モード
+setNotation('sharp');
+check('♯固定', [pcName(1), pcName(3), pcName(6), pcName(8), pcName(10)], ['C♯', 'D♯', 'F♯', 'G♯', 'A♯']);
+setNotation('flat');
+check('♭固定', [pcName(1), pcName(3), pcName(6), pcName(8), pcName(10)], ['D♭', 'E♭', 'G♭', 'A♭', 'B♭']);
+setNotation('both');
+// 「両方」でも主表記は自動と同じ。もう一方は別に取り、UI側で小さく添える。
+// 名前の中に "/" を混ぜるとコード名が読みにくくなるため。
+setDisplayKey(0);
+check('両方でも主表記にスラッシュを混ぜない', pcName(8), 'A♭');
+check('両方のもう一方の呼び方', pcAltName(8), 'G♯');
+check('白鍵には別表記が無い', pcAltName(9), null);
+check('コード名にもスラッシュを混ぜない', chordDisplayName(8, 'm7b5'), 'A♭m7♭5');
+check('コード名のもう一方はルートだけ差し替わる', chordAltName(8, 'm7b5'), 'G♯m7♭5');
+check('自動モードでは別表記を出さない',
+  (setNotation('auto'), [pcAltName(8), chordAltName(8, 'm7')]), [null, null]);
+check('どのモードでも主表記にスラッシュが出ない',
+  ['auto', 'sharp', 'flat', 'both'].every(m => {
+    setNotation(m);
+    return [...Array(12).keys()].every(pc => !pcName(pc).includes('/'));
+  }), true);
+setNotation('both');
+
+// 内部用の名前は変えない（soundfont-player に渡すため ASCII のままである必要がある）
+setNotation('flat');
+check('音源に渡す名前はASCIIのシャープ表記のまま', midiToNoteName(68), 'G#4');
+check('画面に出す名前だけが切り替わる', midiDisplayName(68), 'A♭4');
+check('内部名に Unicode の記号が混じらない',
+  [...Array(128).keys()].every(m => /^[A-G]#?-?\d+$/.test(midiToNoteName(m))), true);
+
+// コード名もキーに追従する
+setNotation('auto');
+setDisplayKey(0);
+check('キーCでの借用和音', [[5, 'minor'], [8, 'major'], [10, 'major']]
+  .map(([r, t]) => chordDisplayName(r, t)), ['Fm', 'A♭', 'B♭']);
+setDisplayKey(2);
+check('キーDでは♯側の綴りになる', [[6, 'major'], [1, 'minor']]
+  .map(([r, t]) => chordDisplayName(r, t)), ['F♯', 'C♯m']);
+check('引数でキーを明示すればそちらが優先', chordDisplayName(8, 'major', [], 0), 'A♭');
+setDisplayKey(0);
+check('モードは取得できる', getNotation(), 'auto');
+
+
+// ============================================================
+// コード名の読みやすさ / ドレミとの整合
+// ============================================================
+console.log('--- コード名の読みやすさ ---');
+setNotation('auto'); setDisplayKey(8);
+// 数字が連結して「A♭m76」のように読めなくなっていた
+check('m7 + 6th は括弧でくくる', chordDisplayName(8, 'm7', ['6']), 'A♭m7(6)');
+// フォールバックの「(9th)」ではなく、慣習表記になるようにした
+check('m7♭5 + 9th', chordDisplayName(8, 'm7b5', ['9']), 'A♭m9♭5');
+check('mM7 + 9th', chordDisplayName(8, 'mmaj7', ['9']), 'A♭mM9');
+check('sus4 + 9th は括弧併記', chordDisplayName(8, 'sus4', ['9']), 'A♭sus4(9)');
+check('コード名に "th" が混ざらない',
+  Object.keys(CHORD_TYPE_LABELS).filter(t => t !== 'none')
+    .every(t => !chordDisplayName(0, t, ['9']).includes('th')), true);
+// 6th/add9 は型のラベル末尾の数字とくっつきやすいので、括弧でくくれているか全型で確認
+//（C11 / C13 のような2桁のテンション数字は正しい表記なので対象外）
+let glued = [];
+for (const t of Object.keys(CHORD_TYPE_LABELS)) {
+  if (t === 'none') continue;
+  for (const tn of [['6'], ['6', 'add9'], ['add9']]) {
+    const n = chordDisplayName(0, t, tn);
+    if (/\d\d/.test(n.replace(/\(.*?\)/g, ''))) glued.push(`${t}+${tn}=${n}`);
+  }
+}
+check('6th/add9 を足しても数字が連結しない', glued, []);
+check('sus4 + 6th + add9', chordDisplayName(0, 'sus4', ['6', 'add9']), 'Csus4(6/9)');
+check('dim7 + 6th', chordDisplayName(0, 'dim7', ['6']), 'Cdim7(6)');
+check('三和音の 6th + add9 は素直に6/9', chordDisplayName(0, 'major', ['6', 'add9']), 'C6/9');
+
+console.log('--- 「7が消えた」ときの内訳 ---');
+check('m7 + 9th は m9 になるので内訳を出す',
+  chordBreakdown(8, 'm7', ['9']), 'A♭m7 に 9th を足した形');
+check('三和音 + 9th は♭7thが増えることも伝える',
+  chordBreakdown(0, 'major', ['9']),
+  'C に 9th を足した形（9th以上は7thの上に積むので、♭7thも一緒に入ります）');
+check('名前が隠れないときは内訳を出さない', chordBreakdown(0, 'major', ['add9']), null);
+check('テンションが無ければ内訳なし', chordBreakdown(0, 'm7', []), null);
+
+console.log('--- ドレミ表記が音名の綴りに追従する ---');
+setNotation('auto'); setDisplayKey(0);
+check('キーCの b6 は ラ♭（音名 A♭ と一致）', [solfegeName(8), pcName(8)], ['ラ♭', 'A♭']);
+setNotation('sharp');
+check('♯モードなら ソ♯（音名 G♯ と一致）', [solfegeName(8), pcName(8)], ['ソ♯', 'G♯']);
+setNotation('auto');
+check('ドレミと音名で変化記号が食い違わない',
+  [...Array(12).keys()].every(pc => {
+    const s = solfegeName(pc), n = pcName(pc);
+    return s.slice(-1) === n.slice(-1) || (!/[♯♭]/.test(s) && !/[♯♭]/.test(n));
+  }), true);
+check('白鍵は素のドレミ',
+  [0, 2, 4, 5, 7, 9, 11].map(pc => solfegeName(pc)),
+  ['ド', 'レ', 'ミ', 'ファ', 'ソ', 'ラ', 'シ']);
+setDisplayKey(0);
+
+
+// ============================================================
+// コード構成音の綴り（度数ベース）
+// ============================================================
+console.log('--- 構成音の綴り（度数ベース） ---');
+setNotation('auto'); setDisplayKey(0);
+const sp = (r, t, tn = []) => chordSpelling(r, t, tn).map(x => x.name).join(' ');
+const dg = (r, t, tn = []) => chordSpelling(r, t, tn).map(x => x.degreeLabel).join(' ');
+
+// キー基準で綴っていたときの誤り（Cdim→C E♭ F♯ 等）が直っているか
+check('Cdim は♭5（F♯ではなくG♭）', sp(0, 'dim'), 'C E♭ G♭');
+check('Caug は♯5（A♭ではなくG♯）', sp(0, 'aug'), 'C E G♯');
+check('Dm7♭5 は♭5（G♯ではなくA♭）', sp(2, 'm7b5'), 'D F A♭ C');
+setDisplayKey(8);
+check('A♭m7 の短3度は C♭', sp(8, 'm7'), 'A♭ C♭ E♭ G♭');
+setDisplayKey(0);
+check('度数ラベル（dim）', dg(0, 'dim'), '1 ♭3 ♭5');
+check('度数ラベル（aug）', dg(0, 'aug'), '1 3 ♯5');
+check('度数ラベル（sus4）', dg(0, 'sus4'), '1 4 5');
+
+// 重変記号が要る音は読みやすい表記に落とし、理論は度数ラベルに残す
+check('Cdim7 の第4音は読みやすい表記に落とす', sp(0, 'dim7'), 'C E♭ G♭ A');
+check('落としても度数は♭♭7のまま', dg(0, 'dim7'), '1 ♭3 ♭5 ♭♭7');
+check('落としたことが flag で分かる',
+  chordSpelling(0, 'dim7').map(x => x.simplified), [false, false, false, true]);
+
+// テンション（buildChord と同じ音になっているか）
+check('C + 9th は♭7も一緒に入る', sp(0, 'major', ['9']), 'C E G B♭ D');
+check('C + 9th の度数', dg(0, 'major', ['9']), '1 3 5 ♭7 9');
+check('Cmaj7 + 13th', dg(0, 'maj7', ['13']), '1 3 5 7 13');
+check('C + add9 は7thを足さない', dg(0, 'major', ['add9']), '1 3 5 9');
+
+// 音そのものは buildChord と一致していること（表示だけ変えて音がずれたら本末転倒）
+let mismatch = [];
+for (let r = 0; r < 12; r++) {
+  for (const t of Object.keys(CHORD_INTERVALS)) {
+    for (const tn of [[], ['9'], ['add9'], ['13'], ['6']]) {
+      // sus2+9 のように同じピッチクラスが2オクターブに出る形があるので、両辺とも重複を除く
+      const a = [...new Set(chordSpelling(r, t, tn).map(x => x.pc))].sort((x, y) => x - y);
+      const b = [...new Set(buildChord({ rootPc: r, type: t, octave: 4, tensions: tn }).midi
+        .map(m => m % 12))].sort((x, y) => x - y);
+      if (JSON.stringify(a) !== JSON.stringify(b)) mismatch.push(`${r}:${t}:${tn}`);
+    }
+  }
+}
+check('綴りの音が buildChord と完全に一致する（840通り）', mismatch, []);
+
+// 度数どおりに文字が進んでいるか（3度なら文字は2つ先）＝音程が読める綴りになっているか
+const L = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+let badSpell = [];
+for (let r = 0; r < 12; r++) {
+  for (const t of Object.keys(CHORD_INTERVALS)) {
+    const list = chordSpelling(r, t);
+    const rootLi = L.indexOf(list[0].name[0]);
+    list.forEach(x => {
+      if (x.simplified) return;   // 読みやすさ優先で落とした音は対象外
+      if (L.indexOf(x.name[0]) !== (rootLi + x.degree - 1) % 7) badSpell.push(`${r}:${t}:${x.name}`);
+    });
+  }
+}
+check('全156通りで度数どおりの文字になっている', badSpell, []);
+
+// ♯モードでもルートに合わせて綴りが変わる
+setNotation('sharp');
+check('♯モードの G♯m7', sp(8, 'm7'), 'G♯ B D♯ F♯');
+setNotation('auto'); setDisplayKey(0);
+check('Map から引ける', chordSpellingMap(0, 'dim').get(6).name, 'G♭');
 
 console.log(`\n結果: ${pass} passed, ${fail} failed`);
 process.exit(fail > 0 ? 1 : 0);

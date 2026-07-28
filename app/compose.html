@@ -5,134 +5,189 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>作曲モード | 音楽コード勉強アプリ</title>
 <script>(function(){try{document.documentElement.dataset.theme=localStorage.getItem('theme')||'light';}catch(e){}})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/compose.css">
 </head>
 <body>
-<header class="app-nav">
-  <span class="brand">🎹 音楽コード勉強アプリ</span>
-  <a href="tutorial.html">入門</a>
-  <a href="index.html">練習</a>
-  <a href="compose.html" class="active">作曲</a>
-  <a href="learn.html">解説</a>
-  <a href="魔法陣.html">魔法陣</a>
-  <a href="compare.html">聴き比べ</a>
-  <button id="themeToggle" type="button" aria-label="テーマ切り替え">🌙</button>
-</header>
-<main class="wide">
-  <h1>作曲モード</h1>
-  <p class="lead">コード・メロディ・ベースの3トラックをピアノロールに配置して作曲する。ピアノロール上にマウスを乗せると点線で追加位置がプレビューされ、クリックで確定します。長さはノート上でマウスホイールを回して変更できます。</p>
+<div class="cv2">
 
-  <div class="compose-layout">
-    <!-- 左: 操作パネル -->
-    <div class="compose-side">
+  <!-- ヘッダー: ブランド＋サイトナビ＋キー操作＋テーマ -->
+  <header class="cv2-header">
+    <div class="cv2-header-inner">
+      <a href="index.html" class="cv2-brand"><span class="dot"></span>作曲</a>
+      <nav class="cv2-nav">
+        <a href="tutorial.html">入門</a>
+        <a href="index.html">練習</a>
+        <a href="compose.html" class="active">作曲</a>
+        <a href="learn.html">解説</a>
+        <a href="魔法陣.html">魔法陣</a>
+        <a href="compare.html">聴き比べ</a>
+      </nav>
+      <div class="cv2-spacer"></div>
+      <div class="cv2-key">
+        <span class="lbl">キー</span>
+        <div class="stepper">
+          <button id="keyDown" type="button" aria-label="キーを下げる">‹</button>
+          <span class="name" id="keyName">C</span>
+          <button id="keyUp" type="button" aria-label="キーを上げる">›</button>
+        </div>
+      </div>
+      <button id="themeToggle" class="cv2-theme" type="button" aria-label="テーマ切り替え">🌙</button>
+    </div>
+  </header>
 
-      <section class="panel">
-        <h2 style="margin-top:0;">プリセットから読み込む</h2>
-        <div class="row">
-          <label class="field">進行プリセット
-            <select id="presetSelect"></select>
-          </label>
-        </div>
-        <div class="row">
-          <label class="field">キー
-            <select id="keySelect"></select>
-          </label>
-          <button id="loadPresetBtn" class="primary">コードトラックに読み込む</button>
-        </div>
-      </section>
+  <main class="cv2-main">
 
-      <section class="panel">
-        <h2 style="margin-top:0;">音を追加するトラック</h2>
-        <div class="track-chips">
-          <button type="button" class="track-chip t-chord on" data-track="chord">🎵 コード</button>
-          <button type="button" class="track-chip t-melody" data-track="melody">🎶 メロディ</button>
-          <button type="button" class="track-chip t-bass" data-track="bass">🎸 ベース</button>
-        </div>
-
-        <div class="field-group active" id="chordFields" style="flex-direction:column; align-items:stretch;">
-          <label class="field">タイプ<select id="typeSelect"></select></label>
-          <p class="hint" style="margin:8px 0 4px;">ルート音を鍵盤でタップ: <b id="rootLabel">C</b></p>
-          <div id="rootKeyboard"></div>
-        </div>
-        <div class="field-group" id="noteFields" style="flex-direction:column; align-items:stretch;">
-          <div class="row" style="margin:0 0 6px;">
-            <button type="button" id="noteOctDown" class="small">－オクターブ</button>
-            <span id="noteOctLabel" style="font-size:12px; color:var(--muted);"></span>
-            <button type="button" id="noteOctUp" class="small">＋オクターブ</button>
-          </div>
-          <div id="noteKeyboard"></div>
-          <p class="hint" style="margin:8px 0 0;">選択中の音: <b id="noteLabel">C4</b></p>
-        </div>
-        <div class="row" style="margin-top:10px;">
-          <label class="field">長さ
-            <select id="lenSelect">
-              <option value="0.5">0.5カウント</option>
-              <option value="1">1カウント</option>
-              <option value="2" selected>2カウント</option>
-              <option value="4">4カウント</option>
-            </select>
-          </label>
-          <button id="addBtn">末尾に追加</button>
-          <button id="clearBtn">全消去</button>
-        </div>
-        <p class="hint">👉 右のピアノロールにマウスを乗せると点線でプレビューが出ます。クリックでその位置にこのトラックの音を確定追加できます。</p>
-      </section>
-
-      <section class="panel">
-        <h2 style="margin-top:0;">再生</h2>
-        <div class="row">
-          <button id="playAllBtn" class="primary">3トラック同時再生 ▶</button>
-          <button id="stopBtn">■ 停止</button>
-        </div>
-        <div class="row" style="margin-top:10px;">
-          <label class="field">BPM <span id="bpmLabel">100</span>
-            <input type="range" id="bpmRange" min="60" max="160" value="100">
-          </label>
-        </div>
-        <div class="row" style="margin-top:10px;">
-          <label class="field">コードの音色
-            <select id="instrumentSelect">
-              <option value="acoustic_grand_piano">ピアノ</option>
-              <option value="acoustic_guitar_nylon">アコースティックギター</option>
-              <option value="electric_piano_1">エレクトリックピアノ</option>
-              <option value="string_ensemble_1">ストリングス</option>
-            </select>
-          </label>
-        </div>
-      </section>
-
-      <section class="panel">
-        <h2 style="margin-top:0;">逆引き検索</h2>
-        <p class="lead" style="margin-top:0;">組んだ進行が、プリセット進行（≒有名曲）とどれくらい似ているか診断する。</p>
-        <button id="matchBtn">この進行を診断する</button>
-        <div class="caption-box" id="matchResult" style="margin-top:10px;"></div>
-      </section>
-
+    <!-- STEP 1: コード -->
+    <div class="cv2-step">
+      <span class="badge b1">1</span>
+      <span class="title">コードをならべる</span>
+      <span class="desc">テンプレを選ぶ・カードをタップで試聴・「＋」で足す</span>
     </div>
 
-    <!-- 右: ピアノロール -->
-    <div class="compose-main">
-      <section class="panel">
-        <p class="lead" style="margin:0 0 8px; font-weight:bold; color:var(--text);" id="progressionLabel"></p>
-        <div id="pianoRoll"></div>
-        <div class="proll-legend">
-          <span><span class="sw" style="background:var(--major)"></span>コード（メジャー系）</span>
-          <span><span class="sw" style="background:var(--minor)"></span>コード（マイナー系）</span>
-          <span><span class="sw" style="background:var(--tension-add9)"></span>メロディ</span>
-          <span><span class="sw" style="background:var(--accent-2)"></span>ベース</span>
-        </div>
-        <div class="row" style="margin-top:10px;">
-          <span id="selInfo" style="font-size:13px; color:var(--muted);"></span>
-          <button id="deleteBtn" class="small" disabled>✕ 選択を削除</button>
-        </div>
-      </section>
-    </div>
-  </div>
+    <div class="cv2-presets" id="presets"></div>
 
-  <footer class="note">※クリック=選択＆試聴 / 空いている場所にマウスを乗せると点線プレビュー表示→クリックで確定追加 / ドラッグ横=タイミング移動 / ドラッグ縦=半音移調 / ノート上でホイール=長さ変更 / Deleteキー=削除。メロディはピアノ、ベースはアコースティックベースの音色で鳴ります。</footer>
-</main>
+    <div class="cv2-panel">
+      <div class="cv2-cards" id="cards"></div>
+
+      <!-- 度数の読み方（一度わかれば全部に効く前提知識なので、常に見える所に置く） -->
+      <details class="cv2-degnote">
+        <summary>カードの下の <b>1・♭3・♭5</b> って何？</summary>
+        <p><b>度数</b>といって、<b>ドレミファソラシの何番目か</b>を表す番号です。<b>半音の数ではありません。</b></p>
+        <p>コードは「1つ飛ばし」で音を積むので、1・3・5・7…と奇数が並びます。だから <b>12 や 14 という数字は出てきません</b>。<b>♭3</b> は「3番目の音を半音下げた音」という意味です。</p>
+        <p>この番号は音名の書き方も決めます。Cdim の3つ目は「Cから5番目の文字＝G」を下げた音なので <b>G♭</b> と書きます。同じ鍵盤でも F♯ と書くと「4番目」に見えて、コードの形が読めなくなるからです。</p>
+      </details>
+
+      <!-- 選択コードの操作（7th / 9th / 削除） -->
+      <div class="cv2-selrow" id="selRow" style="display:none;">
+        <span class="lbl" id="selName"></span>
+        <div style="display:flex; gap:9px;">
+          <button class="cv2-tog" id="tog7">7th<small>大人っぽく</small></button>
+          <button class="cv2-tog" id="tog9">9th<small>浮遊感</small></button>
+        </div>
+        <div class="cv2-spacer"></div>
+        <button class="cv2-del" id="delChord">✕ 削除</button>
+      </div>
+
+      <!-- 次のコードの提案パネル -->
+      <div class="cv2-suggest cv2-suggest-chord" id="chordSuggestBox">
+        <div class="cv2-suggest-head">
+          <span class="t">💡 次はどのコードにする？</span>
+          <span class="sub" id="chordSuggestCtx"></span>
+        </div>
+        <div class="cv2-suggest-grid" id="chordSuggestGrid"></div>
+      </div>
+
+      <!-- 逆引き診断（既存機能） -->
+      <div class="cv2-diag">
+        <button id="diagBtn">🔍 この進行、なにの進行？</button>
+        <span class="result" id="diagResult"></span>
+      </div>
+    </div>
+
+    <!-- STEP 2: メロディ -->
+    <div class="cv2-step cv2-gap">
+      <span class="badge b2">2</span>
+      <span class="title">メロディをのせる</span>
+      <span class="desc">おまかせで1本作る／ドレミで足す／ピアノロールで細かく打ち込む</span>
+    </div>
+
+    <div class="cv2-panel">
+
+      <!-- 編集レイヤーの切り替え -->
+      <div class="cv2-layerbar">
+        <span class="lbl">いま編集するのは</span>
+        <div class="cv2-layertabs" id="layerTabs"></div>
+        <div class="cv2-spacer"></div>
+        <div class="cv2-bassmode" id="bassMode"></div>
+      </div>
+
+      <div class="cv2-melbtns">
+        <button class="cv2-auto" id="autoMel">🪄 おまかせで1本つくる</button>
+        <button class="cv2-ghostbtn" id="clearMel">消す</button>
+        <div class="cv2-spacer"></div>
+        <div class="cv2-styles">
+          <span class="lbl">かたち</span>
+          <div class="tabs" id="styleTabs"></div>
+        </div>
+      </div>
+      <div class="cv2-styledesc" id="styleDesc"></div>
+
+      <!-- ドレミ入力 -->
+      <div class="cv2-doremi-box">
+        <div class="cv2-doremi-head">
+          <span class="t">ドレミで1音ずつ足す</span>
+          <span class="hint">● 光っている音が、今のコードに合う音</span>
+          <div class="cv2-spacer"></div>
+          <span class="len-lbl">長さ</span>
+          <div class="cv2-lentabs" id="lenTabs"></div>
+        </div>
+        <div class="cv2-doremi" id="doremi"></div>
+      </div>
+
+      <!-- 次の音の提案パネル -->
+      <div class="cv2-suggest" id="suggestBox">
+        <div class="cv2-suggest-head">
+          <span class="t">💡 次はどの音にする？</span>
+          <span class="sub" id="suggestCtx"></span>
+        </div>
+        <div class="cv2-suggest-grid" id="suggestGrid"></div>
+      </div>
+
+      <!-- ピアノロール -->
+      <div class="cv2-roll-head">
+        <div class="t">🎹 ピアノロール <small>— 空いてる所をクリックで音を追加／緑をドラッグで移動／右端で長さ</small></div>
+        <div class="cv2-legend" id="legend"></div>
+      </div>
+      <div class="cv2-roll">
+        <div class="cv2-roll-labels" id="rollLabels"></div>
+        <div class="cv2-roll-scroll" id="rollScroll">
+          <div class="cv2-roll-beatnums" id="rollBeatnums"></div>
+          <div class="cv2-roll-regions" id="rollRegions"></div>
+          <div class="cv2-roll-grid" id="rollGrid"></div>
+        </div>
+      </div>
+
+      <!-- 選択メロディの操作 -->
+      <div class="cv2-melsel" id="melSelRow" style="display:none;">
+        <span class="lbl" id="melSelLabel"></span>
+        <button id="noteUp">▲ 高く</button>
+        <button id="noteDown">▼ 低く</button>
+        <button id="noteLen" >⟷ 長さ</button>
+        <button class="del" id="noteDel">✕ 消す</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- フッター: 再生 / BPM / ループ / 音色 -->
+  <footer class="cv2-footer">
+    <div class="cv2-footer-inner">
+      <button class="cv2-play" id="playBtn">▶ 再生</button>
+      <div class="cv2-bpm">
+        <span class="lbl">はやさ <span id="bpmLabel">100</span></span>
+        <input type="range" id="bpmRange" min="60" max="160" value="100">
+      </div>
+      <button class="cv2-loop" id="loopBtn">🔁 くりかえし</button>
+      <div class="cv2-spacer"></div>
+      <div class="cv2-inst">
+        <span class="lbl">のび</span>
+        <div class="tabs" id="ringTabs"></div>
+      </div>
+      <div class="cv2-inst">
+        <span class="lbl">音色</span>
+        <div class="tabs" id="instTabs"></div>
+      </div>
+    </div>
+  </footer>
+
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"></script>
 <script type="module" src="js/core/theme.js"></script>
+<script type="module" src="js/core/notation.js"></script>
 <script type="module" src="js/pages/composePage.js"></script>
 </body>
 </html>

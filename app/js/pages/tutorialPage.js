@@ -4,7 +4,7 @@
 // 描画は ui/keyboard.js、音は core/audioEngine.js。
 // ========================================
 
-import { NOTE_LETTERS, midiToNoteName } from '../core/musicTheory.js';
+import { NOTE_LETTERS, pcName, midiDisplayName } from '../core/musicTheory.js';
 import { initAudio, loadInstrument, playNow } from '../core/audioEngine.js';
 import { createKeyboard } from '../ui/keyboard.js';
 
@@ -53,7 +53,7 @@ demo('wholeBtn', () => {
 // 「Cだから4つ」ではなく「どこから数えても4段＝長3度」を体感させる
 const countLabel = document.getElementById('countLabel');
 const countRootSelect = document.getElementById('countRootSelect');
-NOTE_LETTERS.forEach((n, i) => countRootSelect.appendChild(new Option(n, i)));
+NOTE_LETTERS.forEach((_, i) => countRootSelect.appendChild(new Option(pcName(i), i)));
 
 /** ルートから半音を1段ずつ光らせて数え、最後に2音を同時に鳴らす */
 function countUpDemo(kb, root, steps, resultText) {
@@ -78,12 +78,12 @@ function countUpDemo(kb, root, steps, resultText) {
 demo('majThirdBtn', () => {
   const root = 60 + Number(countRootSelect.value);
   countUpDemo(kb2, root, 4,
-    `半音4つ ＝ 長3度！（${midiToNoteName(root)} → ${midiToNoteName(root + 4)}）`);
+    `半音4つ ＝ 長3度！（${midiDisplayName(root)} → ${midiDisplayName(root + 4)}）`);
 });
 demo('minThirdBtn', () => {
   const root = 60 + Number(countRootSelect.value);
   countUpDemo(kb2, root, 3,
-    `半音3つ ＝ 短3度！（${midiToNoteName(root)} → ${midiToNoteName(root + 3)}）`);
+    `半音3つ ＝ 短3度！（${midiDisplayName(root)} → ${midiDisplayName(root + 3)}）`);
 });
 
 // --- STEP 3: 三和音（3度の音を強調表示） ---
@@ -212,3 +212,8 @@ prevBtn.addEventListener('click', () => goTo(current - 1));
 nextBtn.addEventListener('click', () => goTo(current + 1));
 
 goTo(0);
+
+// 音名表記（♯/♭）が切り替わったら、ルート選択肢を描き直す
+document.addEventListener('notationchange', () => {
+  countRootSelect.querySelectorAll('option').forEach((o, i) => { o.textContent = pcName(i); });
+});

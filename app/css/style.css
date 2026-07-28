@@ -1301,3 +1301,46 @@ body.v2 .stage-piano .key.chord-tone { box-shadow: 0 0 22px currentColor; }
   body.v2 .practice-layout { grid-template-columns: 1fr; }
   body.v2 .tower-stage { min-height: 0; }
 }
+
+/* ---- 音名表記（♯/♭）の切替：notation.js が全ページのヘッダーに差し込む ---- */
+.notation-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-right: 8px;
+}
+.notation-switch .lbl {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--muted, #777);
+  white-space: nowrap;
+}
+.notation-switch .tabs {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--panel-2, rgba(127, 127, 127, .12));
+  border: 1px solid var(--border, rgba(127, 127, 127, .28));
+}
+.notation-switch .tabs button {
+  min-width: 30px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--muted, #777);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1.2;
+  cursor: pointer;
+}
+.notation-switch .tabs button:hover { color: var(--accent, #c56); }
+.notation-switch .tabs button.on {
+  background: var(--accent, #c56);
+  color: var(--accent-ink, #fff);
+}
+@media (max-width: 720px) {
+  .notation-switch .lbl { display: none; }
+}
