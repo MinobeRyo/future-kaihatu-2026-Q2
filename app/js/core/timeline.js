@@ -33,13 +33,15 @@ let nextEventId = 1;
  * chordトラック: { rootPc, type, octave, startCount, lengthCount }
  * melody/bass:  単音。type は 'none' 固定
  */
-export function addEvent(tl, track, { rootPc, type = 'none', octave, startCount, lengthCount = 2, tensions = [] }) {
+export function addEvent(tl, track, { rootPc, type = 'none', octave, startCount, lengthCount = 2, tensions = [], voicing = 'root' }) {
   const ev = {
     id: nextEventId++,
     rootPc,
     type: track === 'chord' ? type : 'none',
     // テンション（add9/9th等）は chord トラックのみ保持。単音トラックは常に空。
     tensions: track === 'chord' ? [...tensions] : [],
+    // ボイシング（転回形・開離）も chord トラックのみ
+    voicing: track === 'chord' ? voicing : 'root',
     octave: octave ?? DEFAULT_OCTAVE[track],
     startCount: startCount ?? trackEnd(tl[track]),
     lengthCount
@@ -72,7 +74,10 @@ export function sortTrack(tl, track) {
 /** イベントの構成音（MIDI配列）を返す */
 export function eventMidi(track, ev) {
   if (track === 'chord') {
-    return buildChord({ rootPc: ev.rootPc, type: ev.type, octave: ev.octave, tensions: ev.tensions ?? [] }).midi;
+    return buildChord({
+      rootPc: ev.rootPc, type: ev.type, octave: ev.octave,
+      tensions: ev.tensions ?? [], voicing: ev.voicing ?? 'root'
+    }).midi;
   }
   return [pcToMidi(ev.rootPc, ev.octave)];
 }

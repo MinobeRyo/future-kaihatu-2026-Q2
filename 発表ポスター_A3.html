@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<style>
+@page { size: 420mm 297mm; margin: 0; }
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { width:420mm; height:297mm; }
+body{
+  font-family:"Noto Sans CJK JP","Noto Sans JP",sans-serif;
+  background:#fff; color:#1f2430; -webkit-print-color-adjust:exact; print-color-adjust:exact;
+}
+:root{
+  --muted:#5f6b7d; --border:#dde2ea; --panel:#f7f9fc;
+  --ink:#1f2430; --accent:#2f6fed;
+  --root:#2f6fed; --third:#22c55e; --fifth:#f59e0b; --seventh:#ec4899; --ninth:#0ea5b7;
+}
+.page{ width:420mm; height:297mm; padding:13mm 16mm 11mm; display:block; }
+
+/* ---------- header ---------- */
+header{ display:flex; align-items:center; gap:8mm; padding-bottom:5mm; border-bottom:1.6mm solid var(--ink); }
+.mark{ width:29mm; height:29mm; flex:none; }
+.htext{ flex:1; }
+.eyebrow{ font-size:4mm; letter-spacing:.3em; color:var(--accent); font-weight:800; }
+h1{ font-size:17mm; line-height:1.05; font-weight:900; letter-spacing:-.02em; margin-top:2mm; }
+h1 .yomi{ font-size:5.6mm; font-weight:800; letter-spacing:.24em; color:var(--muted); margin-left:5mm; }
+.tagline{ font-size:5.6mm; color:var(--ink); margin-top:3mm; font-weight:600; }
+.byline{ text-align:right; flex:none; }
+.byline .nm{ font-size:7mm; font-weight:800; }
+.byline .af{ font-size:4mm; color:var(--muted); margin-top:2mm; line-height:1.55; }
+
+/* ---------- purpose ---------- */
+.purpose{ display:flex; gap:9mm; align-items:flex-start; padding:6.5mm 0 6mm; }
+.purpose .ptext + .ptext{ padding-left:9mm; border-left:.4mm solid var(--border); }
+.ptext{ flex:1; }
+.pbig{ font-size:6.8mm; font-weight:900; line-height:1.4; margin-top:2.6mm; letter-spacing:-.01em; }
+.pbig em{ font-style:normal; background:linear-gradient(transparent 62%, #ffdf7e 62%); }
+.psub{ font-size:4.1mm; line-height:1.7; color:#3c4756; margin-top:3mm; }
+.tower{ flex:none; width:80mm; }
+.tower svg{ width:100%; display:block; }
+.towercap{ font-size:3.5mm; color:var(--muted); line-height:1.5; margin-top:2mm; }
+
+/* ---------- shared label ---------- */
+.lbl{ font-size:4mm; font-weight:900; letter-spacing:.24em; color:var(--accent); }
+.lbl.on-dark{ color:#7dd3e0; }
+
+/* ---------- lower : 中身（左） / つくり（右） ---------- */
+.lower{ display:grid; grid-template-columns:1.42fr 1fr; gap:9mm;
+  padding-top:5.5mm; border-top:.5mm solid var(--border); }
+
+.cards{ display:grid; grid-template-columns:1fr 1fr; gap:4mm; margin-top:4mm; }
+.card{ border:.45mm solid var(--border); border-radius:2.6mm; padding:3.6mm 4.4mm; position:relative; overflow:hidden; }
+.card::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:1.8mm; }
+.card.k1::before{ background:var(--root); }    .card.k2::before{ background:var(--third); }
+.card.k3::before{ background:var(--fifth); }   .card.k4::before{ background:var(--seventh); }
+.card.k5::before{ background:var(--ninth); }   .card.k6::before{ background:#8b5cf6; }
+.card .nm{ font-size:5.2mm; font-weight:900; }
+.card .bd{ font-size:3.7mm; line-height:1.55; color:#3c4756; margin-top:1.6mm; }
+
+.how{ background:#1f2937; border-radius:2.6mm; padding:5mm 5.5mm; color:#fff; }
+.howtitle{ font-size:4.8mm; font-weight:800; margin-top:2.6mm; line-height:1.4; }
+.hows{ margin-top:4mm; display:flex; flex-direction:column; gap:3.4mm; }
+.hows .h{ font-size:4.4mm; font-weight:900; }
+.hows .h span{ font-size:3.2mm; font-weight:800; color:#7dd3e0; letter-spacing:.05em; margin-left:2.2mm; }
+.hows .b{ font-size:3.6mm; line-height:1.55; color:#c8d2e0; margin-top:1.2mm; }
+.howfoot{ margin-top:4mm; padding-top:3.2mm; border-top:.3mm solid rgba(255,255,255,.2);
+  font-size:3.7mm; color:#dbe6f4; line-height:1.55; }
+.howfoot b{ color:#fff; }
+.pass{ display:inline-block; background:#16a34a; color:#fff; font-weight:900; font-size:3.4mm;
+  padding:.8mm 2.4mm; border-radius:1.2mm; margin-right:2.2mm; }
+
+footer{ margin-top:5mm; padding-top:3.5mm; border-top:.5mm solid var(--border);
+  display:flex; justify-content:space-between; align-items:center; }
+footer .tech{ font-size:4mm; color:var(--muted); }
+footer .tech b{ color:var(--ink); }
+footer .call{ font-size:5mm; font-weight:900;
+  border:.7mm solid var(--accent); border-radius:2mm; padding:2.4mm 5.5mm; color:var(--accent); }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <svg class="mark" viewBox="0 0 100 100" fill="none">
+      <rect x="26" y="14" width="48" height="17" rx="4" fill="#0ea5b7"/>
+      <rect x="20" y="35" width="60" height="17" rx="4" fill="#f59e0b"/>
+      <rect x="14" y="56" width="72" height="17" rx="4" fill="#22c55e"/>
+      <rect x="8"  y="77" width="84" height="17" rx="4" fill="#2f6fed"/>
+    </svg>
+    <div class="htext">
+      <div class="eyebrow">TUMINE &nbsp;/&nbsp; CHORD LEARNING APP</div>
+      <h1>積み音<span class="yomi">つみね</span></h1>
+      <div class="tagline">理屈より、まず積む。 ── コードを「聴いて」学ぶWebアプリ</div>
+    </div>
+    <div class="byline">
+      <div class="nm">ryom</div>
+      <div class="af">武蔵野大学<br>データサイエンス学部 2年<br>個人開発 / 2026</div>
+    </div>
+  </header>
+
+  <div class="purpose">
+    <div class="ptext">
+      <div class="lbl">動機</div>
+      <div class="psub">
+        「長三度は半音4つ」と読んでも、初心者には何のことか分からない。<br>
+        でも先に音を聴けば「明るい」と分かる。<br>
+        音楽理論の教材は用語の説明から始まるものが多く、そこが最初の壁になる。<br>
+        <b>音楽理論を学んでいる最中の自分がほしかったものを、そのまま形にした。</b>
+      </div>
+    </div>
+    <div class="ptext">
+      <div class="lbl">目的</div>
+      <div class="pbig">用語からではなく、<em>音から</em>理論に入れるようにする。</div>
+      <div class="psub">
+        ボタンを押すと<b>まず音が鳴り、何が起きたかの説明はそのあとに出る。</b>6つの画面すべてでこの順番を守っている。
+      </div>
+    </div>
+    <div class="tower">
+      <svg viewBox="0 0 260 150">
+        <g font-family="Noto Sans CJK JP" font-size="13" font-weight="800">
+          <rect x="52" y="4"   width="106" height="26" rx="5" fill="#0ea5b7"/>
+          <text x="64" y="22" fill="#fff">9th</text>
+          <text x="168" y="22" fill="#5f6b7d" font-size="11" font-weight="500">浮遊感</text>
+
+          <rect x="40" y="34"  width="118" height="26" rx="5" fill="#ec4899"/>
+          <text x="52" y="52" fill="#fff">7th</text>
+          <text x="168" y="52" fill="#5f6b7d" font-size="11" font-weight="500">大人っぽさ</text>
+
+          <rect x="28" y="64"  width="130" height="26" rx="5" fill="#f59e0b"/>
+          <text x="40" y="82" fill="#fff">5度</text>
+          <text x="168" y="82" fill="#5f6b7d" font-size="11" font-weight="500">安定</text>
+
+          <rect x="16" y="94"  width="142" height="26" rx="5" fill="#22c55e"/>
+          <text x="28" y="112" fill="#fff">3度</text>
+          <text x="168" y="112" fill="#5f6b7d" font-size="11" font-weight="500">明暗を決める</text>
+
+          <rect x="4"  y="124" width="154" height="26" rx="5" fill="#2f6fed"/>
+          <text x="16" y="142" fill="#fff">ルート</text>
+          <text x="168" y="142" fill="#5f6b7d" font-size="11" font-weight="500">土台</text>
+        </g>
+      </svg>
+      <div class="towercap">1音ずつ積むと響きが育っていく。この色分けは鍵盤・ピアノロール・五度圏まで全画面で共通。</div>
+    </div>
+  </div>
+
+  <div class="lower">
+
+    <div>
+      <div class="lbl">中身 ── 6つの画面</div>
+      <div class="cards">
+        <div class="card k1">
+          <div class="nm">入門</div>
+          <div class="bd">半音・三度・三和音・セブンスまで、コードの仕組みを7ステップで。必ず音を聴いてから種明かしを読む。</div>
+        </div>
+        <div class="card k2">
+          <div class="nm">練習</div>
+          <div class="bd">コードに1音ずつ足して響きの変化を体感する。足した音は役割の色で光り、前後をその場で聴き比べられる。</div>
+        </div>
+        <div class="card k3">
+          <div class="nm">作曲</div>
+          <div class="bd">コードを並べ、メロディを乗せて再生する。行き詰まったら「次はどのコード？」で候補が出て、試聴してから選べる。</div>
+        </div>
+        <div class="card k4">
+          <div class="nm">解説</div>
+          <div class="bd">コードの種類・テンション・定番の進行をまとめた辞典。読むだけでなく、その場で鳴らして確かめられる。</div>
+        </div>
+        <div class="card k5">
+          <div class="nm">魔法陣</div>
+          <div class="bd">五度圏を回してキーとコードの関係を見る。進行を再生すると鳴っているコードが円の上で光る。</div>
+        </div>
+        <div class="card k6">
+          <div class="nm">聴き比べ</div>
+          <div class="bd">王道進行と小室進行のような2つの進行を、同じキー・同じ速さで切り替える。違うコードだけ色が付く。</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="how">
+      <div class="lbl on-dark">つくり</div>
+      <div class="howtitle">画面を作る前に、<br>3つのエンジンを分けて書いた</div>
+      <div class="hows">
+        <div>
+          <div class="h">理論<span>musicTheory.js</span></div>
+          <div class="b">構成音・テンション・移調・度数の計算を1か所に集約。同じ鍵盤でもキーで書き方が変わるため、度数から綴りを求めて G♭ と F♯ を出し分ける。</div>
+        </div>
+        <div>
+          <div class="h">再生<span>audioEngine.js</span></div>
+          <div class="b">AudioContext の時刻を基準に先まで予約して鳴らすのでテンポが揺れない。停止も確実に効き、3トラック同時・余韻の長さも可変。</div>
+        </div>
+        <div>
+          <div class="h">提案<span>suggest.js</span></div>
+          <div class="b">機能和声の定番の流れと借用和音から、「自然につなぐ／盛り上げる／締める／意外性」の4つの役割で次の候補を出す。</div>
+        </div>
+      </div>
+      <div class="howfoot"><span class="pass">254 tests passed</span><b>3つとも画面にも音源にも依存させていない。</b>音楽理論の計算だけを Node で自動テストできる。</div>
+    </div>
+
+  </div>
+
+  <footer>
+    <div class="tech"><b>Vanilla JS（ESモジュール）／ Web Audio API ／ Soundfont-player</b>　個人開発・全ファイル新規</div>
+    <div class="call">発表では実際に音を出して実演します</div>
+  </footer>
+
+</div>
+</body>
+</html>

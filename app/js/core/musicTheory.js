@@ -25,23 +25,66 @@ export const CHORD_INTERVALS = {
   aug:   [0, 4, 8]
 };
 
-export const CHORD_TYPE_LABELS = {
-  none: '', major: '', minor: 'm', '7': '7', maj7: 'maj7',
-  m7: 'm7', m7b5: 'm7♭5', mmaj7: 'mM7', sus4: 'sus4', sus2: 'sus2',
-  '7sus4': '7sus4', dim: 'dim', dim7: 'dim7', aug: 'aug'
+// コード記号の書き方は流派で違う（maj7 / M7 / △7 はどれも同じコード）。
+// 楽譜やバンドスコアに合わせて選べるようにする。音そのものは一切変わらない。
+export const CHORD_STYLES = [
+  { id: 'pop', label: 'ポップス', sample: 'Cmaj7 / Cm7♭5 / Cdim / Caug' },
+  { id: 'short', label: '省略形', sample: 'CM7 / Cm7-5 / Cdim / Caug' },
+  { id: 'jazz', label: 'ジャズ', sample: 'C△7 / Cø / C° / C+' }
+];
+const CHORD_LABEL_SETS = {
+  pop: {
+    none: '', major: '', minor: 'm', '7': '7', maj7: 'maj7',
+    m7: 'm7', m7b5: 'm7♭5', mmaj7: 'mM7', sus4: 'sus4', sus2: 'sus2',
+    '7sus4': '7sus4', dim: 'dim', dim7: 'dim7', aug: 'aug'
+  },
+  short: {
+    none: '', major: '', minor: 'm', '7': '7', maj7: 'M7',
+    m7: 'm7', m7b5: 'm7-5', mmaj7: 'mM7', sus4: 'sus4', sus2: 'sus2',
+    '7sus4': '7sus4', dim: 'dim', dim7: 'dim7', aug: 'aug'
+  },
+  jazz: {
+    none: '', major: '', minor: 'm', '7': '7', maj7: '△7',
+    m7: 'm7', m7b5: 'ø', mmaj7: 'm△7', sus4: 'sus4', sus2: 'sus2',
+    '7sus4': '7sus4', dim: '°', dim7: '°7', aug: '+'
+  }
 };
+
+let chordStyle = 'pop';
+export function setChordStyle(id) {
+  chordStyle = CHORD_LABEL_SETS[id] ? id : 'pop';
+}
+export function getChordStyle() { return chordStyle; }
+
+/**
+ * コードタイプ → 記号。設定中のスタイルに従う。
+ * Proxy にしてあるので、既存の `CHORD_TYPE_LABELS[type]` はそのまま動く。
+ */
+export const CHORD_TYPE_LABELS = new Proxy({}, {
+  get: (_, k) => CHORD_LABEL_SETS[chordStyle][k],
+  has: (_, k) => k in CHORD_LABEL_SETS.pop,
+  ownKeys: () => Reflect.ownKeys(CHORD_LABEL_SETS.pop),
+  getOwnPropertyDescriptor: () => ({ enumerable: true, configurable: true })
+});
 
 // テンション定義（②テンションコード操作機能用）
 // interval: ルートからの半音数 / label: ボタン表示 / feel: 初心者向け一言解説
 // implies7: 9th/11th/13thは理論上「7thの上に積む」テンションなので、
 //           7thを含まないコードに付けた場合は短7度も一緒に足す。
 //           add9・6thは三和音にそのまま1音足すだけ（7thは足さない）。
+// altered: オルタードテンション。代表の数字にはならず、常に括弧で併記する
+//          （C7 + ♭9 は「C♭9」ではなく「C7(♭9)」）
 export const TENSIONS = {
   add9:  { interval: 14, label: 'add9', feel: '透明感・キラキラした響きが加わる（7thは足さない）' },
   '9':   { interval: 14, label: '9th',  feel: '7thと重なって、おしゃれで浮遊感のある大人の響きになる', implies7: true },
   '11':  { interval: 17, label: '11th', feel: '和風・浮遊感のある不思議な響きになる', implies7: true },
   '13':  { interval: 21, label: '13th', feel: '大人っぽく豊かな、ジャズ的な響きになる', implies7: true },
-  '6':   { interval: 9,  label: '6th',  feel: '柔らかくレトロで安心感のある響きになる' }
+  '6':   { interval: 9,  label: '6th',  feel: '柔らかくレトロで安心感のある響きになる' },
+  // ---- オルタードテンション（ドミナント7thに乗せて緊張感を作る） ----
+  b9:    { interval: 13, label: '♭9',  feel: '強い緊張感。次のコードへ引っぱる力が跳ね上がる', implies7: true, altered: true },
+  '#9':  { interval: 15, label: '♯9',  feel: 'ざらついた濁り。ロックやファンクの攻めた響き', implies7: true, altered: true },
+  '#11': { interval: 18, label: '♯11', feel: '浮遊感のある透明な濁り。リディアンな広がりが出る', implies7: true, altered: true },
+  b13:   { interval: 20, label: '♭13', feel: '翳りのある緊張感。マイナーへ落ちる直前によく合う', implies7: true, altered: true }
 };
 
 // ---------- 音名・MIDI 変換 ----------
@@ -116,11 +159,10 @@ export function getDisplayKey() { return displayKeyPc; }
 
 /** キーの中での度数から、理論的に正しい綴りを組み立てる */
 function spellByKey(pc, keyPc) {
-  // 白鍵はそのまま文字で出す。理論上は キーB の #4 が E♯ になるが、
-  // 初心者向けなので E と読める形を優先する（重変記号も同じ理由で避ける）
-  const white = LETTER_PC.indexOf(pc);
-  if (white !== -1) return LETTERS[white];
-
+  // 白鍵にも変化記号が付くことがある。たとえばキーG♭ のIVは「Gから4番目の文字＝C」
+  // を半音下げた C♭ で、B と書くと4度に見えず和音の形が読めなくなる。
+  // 影響するのは キーG♭ の C♭ と キーB の E♯ の2か所だけで、どちらも楽譜どおりの表記。
+  // （重変記号だけは初心者向けに避ける。下のフォールバック参照）
   const [tonicLetter] = KEY_TONIC[((keyPc % 12) + 12) % 12];
   const off = ((pc - keyPc) % 12 + 12) % 12;
   const li = (tonicLetter + DEGREE_OF_OFF[off] - 1) % 7;
@@ -158,15 +200,26 @@ export function pcAltName(pc, keyPc = displayKeyPc) {
   return main === SHARP_NAMES[p] ? FLAT_NAMES[p] : SHARP_NAMES[p];
 }
 
+/**
+ * 音名にオクターブ番号を付ける。
+ * 番号は「音の高さ」ではなく「文字」で決まる点に注意。
+ * C♭4 は C4 の半音下（MIDI 59）であって、B3 と同じ高さでも番号は 4 になる。
+ * 変化記号ぶんを戻した位置で数えないと、C♭ や B♯ で1オクターブずれる。
+ */
+function withOctave(name, midi) {
+  const acc = (name.match(/♯/g)?.length ?? 0) - (name.match(/♭/g)?.length ?? 0);
+  return name + (Math.floor((midi - acc) / 12) - 1);
+}
+
 /** MIDI番号 → 画面に出す音名（例: 68 → キーCなら 'A♭4'） */
 export function midiDisplayName(midi, keyPc = displayKeyPc) {
-  return pcName(((midi % 12) + 12) % 12, keyPc) + (Math.floor(midi / 12) - 1);
+  return withOctave(pcName(((midi % 12) + 12) % 12, keyPc), midi);
 }
 
 /** MIDI番号のもう一方の呼び方（「両方」モードのみ。無ければ null） */
 export function midiAltName(midi, keyPc = displayKeyPc) {
   const alt = pcAltName(((midi % 12) + 12) % 12, keyPc);
-  return alt ? alt + (Math.floor(midi / 12) - 1) : null;
+  return alt ? withOctave(alt, midi) : null;
 }
 
 // 固定ド（C=ド）のソルフェージュ。音名の綴りにそのまま追従させる——
@@ -263,8 +316,12 @@ const ROLE_TABLE = [
   { iv: 9,  key: 'sixth',   label: '6th' },
   { iv: 10, key: 'seventh', label: '♭7th' },
   { iv: 11, key: 'seventh', label: '7th' },
+  { iv: 13, key: 'ninth',   label: '♭9th' },
   { iv: 14, key: 'ninth',   label: '9th' },
+  { iv: 15, key: 'ninth',   label: '♯9th' },
   { iv: 17, key: 'eleventh', label: '11th' },
+  { iv: 18, key: 'eleventh', label: '♯11th' },
+  { iv: 20, key: 'thirteenth', label: '♭13th' },
   { iv: 21, key: 'thirteenth', label: '13th' }
 ];
 
@@ -374,22 +431,36 @@ export function chordDisplayName(rootPc, type, tensions = [], keyPc = undefined)
   const typeHas7 = (CHORD_INTERVALS[type] || []).some(i => i === 10 || i === 11);
   if (typeHas7 && t.has('add9')) { t.delete('add9'); t.add('9'); }
 
+  // オルタードテンション（♭9/♯9/♯11/♭13）は代表の数字にならず、常に括弧で併記する。
+  // 楽譜の書き方に合わせて記号だけを並べる: C7(♭9♭13)
+  const altered = [...t].filter(x => TENSIONS[x]?.altered);
+  altered.forEach(x => t.delete(x));
+  const alteredLabel = altered
+    .sort((a, b) => TENSIONS[a].interval - TENSIONS[b].interval)
+    .map(x => TENSIONS[x].label).join('');
+
   // 代表になる拡張数字（9 < 11 < 13 の最大）
   let ext = null;
   if (t.has('13')) ext = '13';
   else if (t.has('11')) ext = '11';
   else if (t.has('9')) ext = '9';
+  // 「C13」は9thまで積んだフルの形を指す。9thが無いなら「C7(13)」と書き分ける
+  // （13thだけを足した形。楽譜でもこの2つは区別して書かれる）
+  const fullStack = ext === '9' || t.has('9');
   ['9', '11', '13'].forEach(k => t.delete(k));
   if (ext === '13') t.delete('6'); // 6thと13thは同じ音
 
   let name;
-  if (ext) {
+  if (ext && fullStack) {
     if (type === 'major' || type === '7') name = root + ext;              // C9, D13
     else if (type === 'maj7') name = `${root}maj${ext}`;                  // Cmaj9
     else if (type === 'minor' || type === 'm7') name = `${root}m${ext}`;  // Cm9
     else if (type === 'm7b5') name = `${root}m${ext}♭5`;                  // Cm9♭5
     else if (type === 'mmaj7') name = `${root}mM${ext}`;                  // CmM9
     else name = `${root}${base}(${ext})`;                                 // sus4/dim等は併記
+  } else if (ext) {
+    // 9thを飛ばして足した形。三和音に付けた場合は♭7も入るので 7 を明示する
+    name = `${root}${typeHas7 ? base : base + '7'}(${ext})`;              // C7(13), Cmaj7(13)
   } else {
     name = root + base;
   }
@@ -407,6 +478,11 @@ export function chordDisplayName(rootPc, type, tensions = [], keyPc = undefined)
 
   // 将来のテンション追加用フォールバック
   if (t.size) name += `(${[...t].map(x => TENSIONS[x]?.label ?? x).join(',')})`;
+  if (alteredLabel) {
+    // 7thを持たない形にオルタードを付けた場合、♭7が足されるので名前にも7を出す
+    if (!typeHas7 && !ext && !/\d$/.test(name)) name += '7';
+    name += `(${alteredLabel})`;
+  }
   return name;
 }
 
@@ -457,7 +533,10 @@ const CHORD_DEGREES = {
   m7: [1, 3, 5, 7], m7b5: [1, 3, 5, 7], mmaj7: [1, 3, 5, 7], sus4: [1, 4, 5], sus2: [1, 2, 5],
   '7sus4': [1, 4, 5, 7], dim: [1, 3, 5], dim7: [1, 3, 5, 7], aug: [1, 3, 5]
 };
-const TENSION_DEGREE = { add9: 9, '9': 9, '11': 11, '13': 13, '6': 6 };
+const TENSION_DEGREE = {
+  add9: 9, '9': 9, '11': 11, '13': 13, '6': 6,
+  b9: 9, '#9': 9, '#11': 11, b13: 13   // オルタードも度数は 9/11/13（変化記号が付くだけ）
+};
 /** 度数 → メジャースケール上の半音数（度数ラベルの♯♭を決める基準） */
 const MAJOR_INTERVAL = { 1: 0, 2: 2, 3: 4, 4: 5, 5: 7, 6: 9, 7: 11, 9: 14, 11: 17, 13: 21 };
 
@@ -528,7 +607,11 @@ const DEGREE_MEANING = {
   '7':  '7番目の音。おしゃれで落ち着いた響きになる',
   '♭♭7': '7番目の音を半音2つ下げた音。鍵盤は6番目と同じだが、7番目を下げたものとして数える',
   '9':  '1オクターブ上の2番目の音。透明感が加わる',
+  '♭9': '9番目の音を半音下げた音。強い緊張感が出て、次へ進む力が跳ね上がる',
+  '♯9': '9番目の音を半音上げた音。3度とぶつかってざらついた濁りが出る',
   '11': '1オクターブ上の4番目の音。浮遊感のある不思議さ',
+  '♯11': '11番目の音を半音上げた音。透明な濁り。広がりのある響きになる',
+  '♭13': '13番目の音を半音下げた音。翳りのある緊張感が出る',
   '13': '1オクターブ上の6番目の音。大人っぽく豊かになる'
 };
 

@@ -7,7 +7,9 @@ import {
   buildChord, midiToNoteName, noteNameToPc, degreeToRoman,
   transposeProgression, chordDisplayName, matchProgressions, noteRole
 } from '../js/core/musicTheory.js';
-import { PROGRESSION_PRESETS, presetToChords } from '../js/data/progressions.js';
+import {
+  PROGRESSION_PRESETS, presetToChords, presetKeyPc, presetToBass, BASS_BASE_OCTAVE
+} from '../js/data/progressions.js';
 import {
   createTimeline, addEvent, eventMidi, transposeEvent, moveEvent,
   toPlayableTracks, timelineEnd, pitchRange
@@ -20,8 +22,9 @@ import { suggestMelodyNotes, suggestBassNotes, suggestNextChords, doremiOf } fro
 import { RING_MODES, ringModeOf, noteDuration } from '../js/core/audioEngine.js';
 import {
   pcName, pcAltName, midiDisplayName, setNotation, getNotation, setDisplayKey,
-  NOTATION_MODES, chordAltName, chordBreakdown, solfegeName, CHORD_TYPE_LABELS,
-  chordSpelling, chordSpellingMap, CHORD_INTERVALS
+  NOTATION_MODES, chordAltName, chordBreakdown, solfegeName, CHORD_TYPE_LABELS, degreeMeaning,
+  chordSpelling, chordSpellingMap, CHORD_INTERVALS,
+  CHORD_STYLES, setChordStyle, getChordStyle, TENSIONS, noteRole as _nr
 } from '../js/core/musicTheory.js';
 
 let pass = 0, fail = 0;
@@ -364,9 +367,8 @@ for (let k = 0; k < 12; k++) {
   const letters = MAJOR.map(o => pcName((k + o) % 12, k)[0]);
   if (new Set(letters).size !== 7) scaleNg.push(k);
 }
-// G♭/F♯ キー(pc=6)だけは例外。理論上は C♭（または E♯）が要るが、
-// 初心者向けなので白鍵は素直に B（F）と表記する方を優先している。意図的な割り切り。
-check('G♭/F♯キー以外は音名の文字が重複しない', scaleNg, [6]);
+// 白鍵にも変化記号を許したので、全12キーで文字が7つ揃う（G♭ の IV は C♭ になる）
+check('全12キーのスケールで音名の文字が重複しない', scaleNg, []);
 // 重変記号（♯♯ / ♭♭）が出ないこと
 let heavy = [];
 for (let k = 0; k < 12; k++) {
@@ -541,6 +543,162 @@ setNotation('sharp');
 check('♯モードの G♯m7', sp(8, 'm7'), 'G♯ B D♯ F♯');
 setNotation('auto'); setDisplayKey(0);
 check('Map から引ける', chordSpellingMap(0, 'dim').get(6).name, 'G♭');
+
+
+// ============================================================
+// オルタードテンション（♭9 / ♯9 / ♯11 / ♭13）
+// ============================================================
+console.log('--- オルタードテンション ---');
+setNotation('auto'); setChordStyle('pop');
+check('4種類が追加されている',
+  ['b9', '#9', '#11', 'b13'].every(k => TENSIONS[k]?.altered), true);
+// コード名は代表数字にせず、括弧で併記する（楽譜の書き方に合わせる）
+setDisplayKey(1);
+check('D♭7(♭13)', chordDisplayName(1, '7', ['b13']), 'D♭7(♭13)');
+setDisplayKey(10);
+check('B♭7(♭9♭13)', chordDisplayName(10, '7', ['b9', 'b13']), 'B♭7(♭9♭13)');
+setDisplayKey(0);
+check('C7(♯9)', chordDisplayName(0, '7', ['#9']), 'C7(♯9)');
+check('Cmaj7(♯11)', chordDisplayName(0, 'maj7', ['#11']), 'Cmaj7(♯11)');
+check('通常テンションと併用: C9(♭13)', chordDisplayName(0, '7', ['9', 'b13']), 'C9(♭13)');
+check('三和音に付けると7も出る', chordDisplayName(0, 'major', ['b9']), 'C7(♭9)');
+check('♭9♭13 は音程順に並ぶ', chordDisplayName(0, '7', ['b13', 'b9']), 'C7(♭9♭13)');
+
+// 綴りと度数
+check('C7(♭9) の綴り', chordSpelling(0, '7', ['b9']).map(x => x.name).join(' '), 'C E G B♭ D♭');
+check('C7(♭9) の度数', chordSpelling(0, '7', ['b9']).map(x => x.degreeLabel).join(' '), '1 3 5 ♭7 ♭9');
+check('C7(♯11) の綴り', chordSpelling(0, '7', ['#11']).map(x => x.name).join(' '), 'C E G B♭ F♯');
+check('C7(♭13) の度数', chordSpelling(0, '7', ['b13']).map(x => x.degreeLabel).join(' '), '1 3 5 ♭7 ♭13');
+check('♭9 の説明文がある', degreeMeaning('♭9').length > 0, true);
+check('積み木の役割にも入っている', [_nr(13).label, _nr(15).label, _nr(18).label, _nr(20).label],
+  ['♭9th', '♯9th', '♯11th', '♭13th']);
+
+// 音が buildChord と一致するか（オルタード込みで全ルート×全タイプ）
+let altNg = [];
+for (let r = 0; r < 12; r++) {
+  for (const t of Object.keys(CHORD_INTERVALS)) {
+    for (const tn of [['b9'], ['#9'], ['#11'], ['b13'], ['b9', 'b13'], ['9', '#11']]) {
+      const a = [...new Set(chordSpelling(r, t, tn).map(x => x.pc))].sort((x, y) => x - y);
+      const b = [...new Set(buildChord({ rootPc: r, type: t, octave: 4, tensions: tn }).midi
+        .map(m => m % 12))].sort((x, y) => x - y);
+      if (JSON.stringify(a) !== JSON.stringify(b)) altNg.push(`${r}:${t}:${tn}`);
+    }
+  }
+}
+check('オルタード込みでも音が buildChord と一致（1008通り）', altNg, []);
+
+// 手書き楽譜のコードが再現できるか
+setDisplayKey(1);
+check('楽譜のコード列を再現',
+  [[1, '7', ['b13']], [10, '7', ['b9', 'b13']], [8, 'm7', []], [6, 'maj7', []], [5, 'm7b5', []]]
+    .map(([r, t, tn]) => chordDisplayName(r, t, tn)),
+  ['D♭7(♭13)', 'B♭7(♭9♭13)', 'A♭m7', 'G♭maj7', 'Fm7♭5']);
+
+console.log('--- コード記号の表記スタイル ---');
+setDisplayKey(0);
+check('3スタイル', CHORD_STYLES.map(s => s.id), ['pop', 'short', 'jazz']);
+const symbols = () => [[0, 'maj7'], [0, 'm7b5'], [0, 'dim'], [0, 'aug'], [0, 'mmaj7']]
+  .map(([r, t]) => chordDisplayName(r, t));
+setChordStyle('pop');
+check('ポップス表記', symbols(), ['Cmaj7', 'Cm7♭5', 'Cdim', 'Caug', 'CmM7']);
+setChordStyle('short');
+check('省略形', symbols(), ['CM7', 'Cm7-5', 'Cdim', 'Caug', 'CmM7']);
+setChordStyle('jazz');
+check('ジャズ表記（△7 / ø / ° / +）', symbols(), ['C△7', 'Cø', 'C°', 'C+', 'Cm△7']);
+check('スタイルを変えても音は変わらない',
+  buildChord({ rootPc: 0, type: 'maj7', octave: 4 }).noteNames, ['C4', 'E4', 'G4', 'B4']);
+check('未知のスタイルはポップスに戻る', (setChordStyle('なにこれ'), getChordStyle()), 'pop');
+setChordStyle('pop');
+
+
+// ============================================================
+// オーバードーズ（採譜した進行のプリセット）
+// ============================================================
+console.log('--- お試しコード進行 ---');
+setNotation('auto'); setChordStyle('pop');
+const od = PROGRESSION_PRESETS.find(p => p.id === 'otameshi');
+check('プリセットが存在する', od?.name, 'お試しコード');
+check('原曲キーはG♭', presetKeyPc(od), 6);
+setDisplayKey(presetKeyPc(od));
+check('譜面どおりのコード列',
+  presetToChords(od, presetKeyPc(od)).map(c => chordDisplayName(c.rootPc, c.type, c.tensions)),
+  ['A♭m9', 'D♭7(13)', 'G♭maj7', 'C♭maj7', 'Fm7♭5', 'B♭7(♭13)', 'E♭maj7']);
+// キーG♭ の IV は B ではなく C♭（4番目の文字がCだから）
+check('IVは C♭ と綴られる', pcName(11, 6), 'C♭');
+check('キーCへ移調しても度数関係が保たれる',
+  (setDisplayKey(0), presetToChords(od, 0).map(c => chordDisplayName(c.rootPc, c.type, c.tensions))),
+  ['Dm9', 'G7(13)', 'Cmaj7', 'Fmaj7', 'Bm7♭5', 'E7(♭13)', 'Amaj7']);
+check('全コードが発音できる',
+  presetToChords(od, 6).every(c => buildChord({ ...c, octave: 4 }).midi.length > 0), true);
+// プリセットのテンションが取りこぼされていないか
+check('テンションが presetToChords から渡る',
+  presetToChords(od, 6).map(c => c.tensions.join('')), ['9', '13', '', '', '', 'b13', '']);
+
+console.log('--- 13th の書き分け（C13 と C7(13) は別物） ---');
+setDisplayKey(0);
+check('9thまで積めば C13', chordDisplayName(0, '7', ['9', '13']), 'C13');
+check('9thが無ければ C7(13)', chordDisplayName(0, '7', ['13']), 'C7(13)');
+check('11thも同じ', chordDisplayName(0, '7', ['11']), 'C7(11)');
+check('9thがあれば C11', chordDisplayName(0, '7', ['9', '11']), 'C11');
+check('maj7 + 13th', chordDisplayName(0, 'maj7', ['13']), 'Cmaj7(13)');
+check('三和音に13thを足すと♭7が入るので7を明示', chordDisplayName(0, 'major', ['13']), 'C7(13)');
+check('マイナー三和音でも同様', chordDisplayName(0, 'minor', ['13']), 'Cm7(13)');
+check('9thだけなら従来どおり C9', chordDisplayName(0, '7', ['9']), 'C9');
+// 音は書き分けによって変わらない
+check('C7(13) と C13 で音が違う（13だけ vs 9も入る）',
+  [buildChord({ rootPc: 0, type: '7', octave: 4, tensions: ['13'] }).midi.length,
+   buildChord({ rootPc: 0, type: '7', octave: 4, tensions: ['9', '13'] }).midi.length], [5, 6]);
+
+
+console.log('--- オクターブ番号は「文字」で決まる ---');
+setNotation('auto'); setDisplayKey(6);   // キーG♭
+// C♭4 は C4 の半音下（MIDI 59）。B3 と同じ高さでも、文字がCなので番号は4になる
+check('MIDI 59 は C♭4（B3と同じ高さ）', midiDisplayName(59), 'C♭4');
+check('MIDI 47 は C♭3', midiDisplayName(47), 'C♭3');
+check('MIDI 71 は C♭5', midiDisplayName(71), 'C♭5');
+check('♭が付かない音はそのまま', [midiDisplayName(60), midiDisplayName(58)], ['C4', 'B♭3']);
+setNotation('sharp'); setDisplayKey(0);
+check('♯側も同じ規則（F♯4 は MIDI 66）', midiDisplayName(66), 'F♯4');
+// 表示が変わってもMIDIへ戻せること（表記と実体がずれていない確認）
+setNotation('auto');
+let octNg = [];
+for (let k = 0; k < 12; k++) {
+  setDisplayKey(k);
+  for (let m = 24; m <= 96; m++) {
+    const n = midiDisplayName(m);
+    const oct = parseInt(n.match(/-?\d+$/)[0], 10);
+    const body = n.replace(/-?\d+$/, '');
+    const acc = (body.match(/♯/g)?.length ?? 0) - (body.match(/♭/g)?.length ?? 0);
+    const base = [0, 2, 4, 5, 7, 9, 11]['CDEFGAB'.indexOf(body[0])];
+    if (12 * (oct + 1) + base + acc !== m) octNg.push(`key${k}:${m}=${n}`);
+  }
+}
+check('全12キー×MIDI24-96で表示から元のMIDIに戻せる', octNg, []);
+setDisplayKey(0);
+
+
+console.log('--- プリセットのベースライン ---');
+const bassMidi = (preset, k) => presetToBass(preset, k)
+  .map(b => 12 * (b.octave + 1) + b.rootPc);
+const toName = (preset, k) => (setDisplayKey(k), presetToBass(preset, k)
+  .map(b => midiDisplayName(12 * (b.octave + 1) + b.rootPc)));
+setNotation('auto');
+check('お試しコードはベースラインを持つ', Array.isArray(od.bass), true);
+check('譜面どおりのベース（キーG♭）', toName(od, 6),
+  ['A♭2', 'D♭2', 'G♭2', 'C♭2', 'F2', 'B♭1', 'E♭2']);
+// 5度下がって4度上がる動きが保たれているか
+const motion = (k) => { const m = bassMidi(od, k); return m.slice(1).map((x, i) => x - m[i]); };
+check('動きは -7 +5 -7 +6 -7 +5', motion(6), [-7, 5, -7, 6, -7, 5]);
+check('キーCへ移調しても形が同じ', motion(0), motion(6));
+check('全12キーで形が保たれる',
+  [...Array(12).keys()].every(k => JSON.stringify(motion(k)) === JSON.stringify(motion(6))), true);
+check('コードの数とベースの数が一致', presetToBass(od, 6).length, od.degrees.length);
+// ベースの1音目はコードのルートと同じ音名になっているか
+check('各ベース音がコードのルートと一致',
+  presetToBass(od, 6).map(b => b.rootPc), presetToChords(od, 6).map(c => c.rootPc));
+check('ベースを持たないプリセットは null', presetToBass(oudou, 0), null);
+check('基準オクターブ', BASS_BASE_OCTAVE, 2);
+setDisplayKey(0);
 
 console.log(`\n結果: ${pass} passed, ${fail} failed`);
 process.exit(fail > 0 ? 1 : 0);

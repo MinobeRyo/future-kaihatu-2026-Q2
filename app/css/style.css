@@ -1302,6 +1302,190 @@ body.v2 .stage-piano .key.chord-tone { box-shadow: 0 0 22px currentColor; }
   body.v2 .tower-stage { min-height: 0; }
 }
 
+/* ================================================================
+   v2 デザイン: 解説 / 聴き比べ / 魔法陣ページ向けの追加スタイル
+   HTML構造・JSは変更せず、既存クラスの見た目だけを v2 パレットに寄せる。
+   （body.v2 が付かないページでは従来の青系スタイルのまま）
+   ================================================================ */
+
+/* --- 見出し・セクション間隔 --- */
+body.v2 main > h2 {
+  font-size: 20px;
+  margin: 34px 0 14px;
+  padding-left: 13px;
+  border-left: 4px solid var(--accent);
+  border-radius: 2px;
+  line-height: 1.5;
+}
+body.v2 main > h2:first-of-type { margin-top: 26px; }
+
+/* --- 小さいボタン --- */
+body.v2 button.small {
+  padding: 7px 13px;
+  font-size: 12.5px;
+  border-radius: 11px;
+}
+
+/* --- スライダー（BPM など） --- */
+body.v2 input[type=range] { accent-color: var(--accent); }
+
+/* --- カード（コードタイプ一覧 / 進行プリセット / A・Bカード） --- */
+body.v2 .progression-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  box-shadow: var(--shadow-sm);
+  padding: 18px 20px;
+  margin-bottom: 14px;
+  transition: transform .16s, box-shadow .16s, border-color .16s;
+  animation: v2CardIn .4s cubic-bezier(.2,.7,.2,1) both;
+}
+body.v2 .progression-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-line);
+  box-shadow: var(--shadow);
+}
+body.v2 .progression-card h3 {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin: 0 0 6px;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+}
+body.v2 .progression-card .mood {
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.75;
+  margin: 4px 0 10px;
+  text-wrap: pretty;
+}
+
+/* --- タグ（ローマ数字・雰囲気ラベル） --- */
+body.v2 .tag {
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  border-radius: 999px;
+  padding: 3px 12px;
+  font-family: var(--font-alt);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: .03em;
+  color: var(--accent);
+  margin-right: 0;
+}
+/* h3内のローマ数字タグは本文フォント側に寄せて読みやすく */
+body.v2 .progression-card h3 .tag { font-size: 12px; }
+
+/* --- 楽曲リスト --- */
+body.v2 .song-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+body.v2 .song-list li {
+  font-size: 12.5px;
+  color: var(--muted);
+  background: var(--surface-2);
+  border-radius: 10px;
+  padding: 5px 11px;
+  line-height: 1.5;
+}
+
+/* --- テンション一覧テーブル --- */
+body.v2 table.theory-table { font-size: 14px; }
+body.v2 table.theory-table th {
+  font-family: var(--font-alt);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 6px 12px 10px;
+  border-bottom: 1.5px solid var(--border-strong);
+}
+body.v2 table.theory-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  line-height: 1.7;
+  vertical-align: middle;
+}
+body.v2 table.theory-table tbody tr { transition: background .15s; }
+body.v2 table.theory-table tbody tr:hover { background: var(--surface-2); }
+body.v2 table.theory-table tbody tr:last-child td { border-bottom: none; }
+body.v2 table.theory-table td:first-child {
+  font-weight: 700;
+  color: var(--accent);
+  white-space: nowrap;
+}
+body.v2 table.theory-table td:last-child { text-align: right; width: 1%; }
+
+/* --- 聴き比べ: 進行タイムラインとコードブロック --- */
+body.v2 .timeline {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 12px;
+  gap: 9px;
+}
+body.v2 .chord-block {
+  min-width: 82px;
+  border-radius: 14px;
+  padding: 12px 10px;
+  font-family: var(--font-alt);
+  font-size: 15px;
+  background: linear-gradient(160deg, oklch(0.72 0.15 46), oklch(0.66 0.15 28));
+  box-shadow: 0 8px 18px color-mix(in oklch, var(--accent) 26%, transparent);
+  transition: transform .14s, box-shadow .14s;
+}
+body.v2 .chord-block:hover { transform: translateY(-2px); }
+body.v2 .chord-block.minor-q {
+  background: linear-gradient(160deg, oklch(0.66 0.13 300), oklch(0.58 0.13 288));
+  box-shadow: 0 8px 18px oklch(0.62 0.13 296 / .3);
+}
+body.v2 .chord-block .idx {
+  font-family: var(--font-alt);
+  font-size: 10px;
+  letter-spacing: .1em;
+  opacity: .75;
+}
+body.v2 .chord-block.diff {
+  outline: 2.5px solid var(--diff);
+  outline-offset: 2px;
+}
+
+/* --- 魔法陣: Canvas の額縁 --- */
+body.v2 .circle-wrap {
+  margin: 8px 0 22px;
+  padding: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 26px;
+  box-shadow: var(--shadow-sm);
+}
+body.v2 .circle-wrap canvas {
+  border: none;
+  border-radius: 18px;
+  background: var(--bg);
+}
+
+/* --- 脚注 --- */
+body.v2 footer.note {
+  margin-top: 34px;
+  padding: 14px 16px;
+  background: var(--surface-2);
+  border-radius: 14px;
+  font-size: 12px;
+  line-height: 1.85;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+
 /* ---- 音名表記（♯/♭）の切替：notation.js が全ページのヘッダーに差し込む ---- */
 .notation-switch {
   display: inline-flex;
@@ -1343,4 +1527,9 @@ body.v2 .stage-piano .key.chord-tone { box-shadow: 0 0 22px currentColor; }
 }
 @media (max-width: 720px) {
   .notation-switch .lbl { display: none; }
+}
+
+/* ヘッダーが横に長くなりすぎないよう、狭い画面では記号スイッチを畳む */
+@media (max-width: 900px) {
+  #chordStyleTabs .lbl { display: none; }
 }

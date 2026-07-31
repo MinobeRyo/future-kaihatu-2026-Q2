@@ -41,7 +41,7 @@ function buildCard(el, presetId, keyPc, diffSet) {
     <p class="mood">${preset.mood}</p>
     <div class="timeline">
       ${chords.map((c, i) => `<div class="chord-block${['minor', 'm7', 'dim'].includes(c.type) ? ' minor-q' : ''}${diffSet.has(i) ? ' diff' : ''}">
-        <span class="idx">${i + 1}</span>${chordDisplayName(c.rootPc, c.type)}
+        <span class="idx">${i + 1}</span>${chordDisplayName(c.rootPc, c.type, c.tensions)}
       </div>`).join('')}
     </div>
     <ul class="song-list">${songs.map(s => `<li>${s.title} / ${s.artist}</li>`).join('') || '<li>（収録準備中）</li>'}</ul>

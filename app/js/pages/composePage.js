@@ -20,7 +20,9 @@ const altTag = (alt) => alt ? `<small class="alt">${alt}</small>` : '';
 import {
   initAudio, loadInstrument, playNow, playTracks, stop, RING_MODES, noteDuration
 } from '../core/audioEngine.js';
-import { PROGRESSION_PRESETS, presetToChords } from '../data/progressions.js';
+import {
+  PROGRESSION_PRESETS, presetToChords, presetKeyPc, presetToBass
+} from '../data/progressions.js';
 import { PALETTE_TABS, paletteChords } from '../data/chordPalette.js';
 import { findSimilarProgressions, matchMessage } from '../data/songs.js';
 import { MELODY_STYLES, generateMelody } from '../core/melodyGen.js';
@@ -91,6 +93,7 @@ const $ = (id) => document.getElementById(id);
 const presetsEl = $('presets');
 const cardsEl = $('cards');
 const selRow = $('selRow'), selNameEl = $('selName'), tog7 = $('tog7'), tog9 = $('tog9'), delChord = $('delChord');
+const octUp = $('octUp'), octDown = $('octDown'), octName = $('octName'), voicingBtn = $('voicingBtn');
 const diagBtn = $('diagBtn'), diagResult = $('diagResult');
 const chordSuggestGridEl = $('chordSuggestGrid'), chordSuggestCtxEl = $('chordSuggestCtx');
 const layerTabsEl = $('layerTabs'), bassModeEl = $('bassMode');
@@ -156,15 +159,81 @@ async function previewEvent(track, ev) {
   await previewMidi(eventMidi(track, ev), TRACK_INSTRUMENTS()[track], dur);
 }
 
+/**
+ * 提案した音を「コードの上で」鳴らす。
+ * 単音だけだとポツンと鳴るだけで、その音が良いのか悪いのか判断できないため、
+ * 下にコードを薄く敷いて、実際に曲の中で聴こえる形で試聴させる。
+ */
+async function previewNoteOverChord(midi, chordEv) {
+  await ensureAudio();
+  const dur = noteDuration(2, Number(bpmRange.value), ringMode);
+  if (chordEv) {
+    await loadInstrument(chordInstrument);
+    playNow(eventMidi('chord', chordEv), { duration: dur, instrument: chordInstrument, gain: 0.5, ring: ringMode });
+  }
+  playNow([midi], { duration: dur, instrument: 'acoustic_grand_piano', gain: 1, ring: ringMode });
+}
+
+/**
+ * 「直前のコード → 提案コード」を続けて鳴らす。
+ * コード単体で聴いても良し悪しがわからないので、必ず流れで聴かせる。
+ */
+async function previewProgression(prevEv, nextChord) {
+  await ensureAudio();
+  await loadInstrument(chordInstrument);
+  const step = 60 / Number(bpmRange.value) * 1.6;
+  const dur = noteDuration(2, Number(bpmRange.value), ringMode);
+  if (prevEv) {
+    playNow(eventMidi('chord', prevEv), { duration: dur, instrument: chordInstrument, gain: 0.75, ring: ringMode });
+  }
+  playNow(eventMidi('chord', { ...nextChord, octave: 4, tensions: nextChord.tensions ?? [] }),
+    { duration: dur, instrument: chordInstrument, gain: 1, ring: ringMode, delay: prevEv ? step : 0 });
+}
+
 // ---------- ベース: 自動生成 ＋ 手動上書き ----------
 // 既定ではコードのルートから自動生成する（初心者は何もしなくていい）。
 // ユーザーがベースを1回でも編集したら 'manual' に切り替わり、以後は自動再生成しない。
 // 「自動に戻す」ボタンでいつでも 'auto' に復帰できる。
+// ベースの音域と、ラインの重心になる高さ
+const BASS_RANGE = { low: 38, high: 57 };   // D2 〜 A3
+const BASS_HOME = 45;                       // A2 あたりを基準にする
+const BASS_PULL = 0.35;                     // 基準の高さへ戻ろうとする強さ
+
+/**
+ * コードのルートから自動ベースを作る。
+ * オクターブを固定するとルートのピッチクラス次第で7度も跳んでしまう
+ * （G♭ の進行だと C♭ や B♭ だけ跳ね上がる）。
+ * 直前の音にいちばん近いオクターブを選んで、なめらかな線にする。
+ */
 function rebuildBass() {
   if (bassMode !== 'auto') return;
+  let prev = BASS_HOME;
   tl.bass = [...tl.chord]
     .sort((a, b) => a.startCount - b.startCount)
-    .map(c => withId({ rootPc: c.rootPc, type: 'none', tensions: [], octave: 3, startCount: c.startCount, lengthCount: c.lengthCount }));
+    .map(c => {
+      const midi = nearestMidiInRange(c.rootPc, prev, BASS_RANGE);
+      prev = midi;
+      return withId({
+        rootPc: c.rootPc, type: 'none', tensions: [], voicing: 'root',
+        octave: Math.floor(midi / 12) - 1,
+        startCount: c.startCount, lengthCount: c.lengthCount
+      });
+    });
+}
+/**
+ * 音域内にある そのピッチクラスの音から、次に置く1つを選ぶ。
+ * 「直前からの動きの少なさ」だけで選ぶと同じ方向へ流れて音域の端に貼りつくので、
+ * 「基準の高さからの遠さ」も足して評価し、真ん中へ戻る力を持たせる。
+ */
+function nearestMidiInRange(pc, prev, range) {
+  const want = ((pc % 12) + 12) % 12;
+  let best = null, bestCost = Infinity;
+  for (let m = range.low; m <= range.high; m++) {
+    if (((m % 12) + 12) % 12 !== want) continue;
+    const cost = Math.abs(m - prev) + BASS_PULL * Math.abs(m - BASS_HOME);
+    if (cost < bestCost) { bestCost = cost; best = m; }
+  }
+  return best ?? (36 + want);
 }
 function markBassManual() {
   if (bassMode === 'manual') return;
@@ -226,9 +295,25 @@ function updatePresetActive() {
 function loadPreset(id) {
   const preset = PROGRESSION_PRESETS.find(p => p.id === id);
   if (!preset) return;
+  // 原曲キーを持つプリセットは、そのキーに合わせて譜面どおりの響きにする
+  keyPc = presetKeyPc(preset, keyPc);
+  updateKeyLabel();
   tl.chord = presetToChords(preset, keyPc).map((c, i) =>
-    withId({ ...c, tensions: [], octave: 4, startCount: i * 2, lengthCount: 2 }));
-  rebuildBass();
+    withId({ ...c, octave: 4, voicing: 'root', startCount: i * 2, lengthCount: 2 }));
+
+  // 決め打ちのベースラインを持つプリセットは、それをそのまま置く。
+  // 自動生成に上書きされないよう手動モードにする（「自動に戻す」でいつでも戻せる）
+  const presetBass = presetToBass(preset, keyPc);
+  if (presetBass) {
+    bassMode = 'manual';
+    tl.bass = presetBass.map((b, i) => withId({
+      ...b, type: 'none', tensions: [], voicing: 'root',
+      startCount: i * 2, lengthCount: 2
+    }));
+  } else {
+    bassMode = 'auto';
+    rebuildBass();
+  }
   activePresetId = id;
   selected = null;
   diagResult.textContent = '';
@@ -445,10 +530,38 @@ function updateSelRow() {
   const ev = selected?.track === 'chord' ? findEvent(tl, 'chord', selected.id) : null;
   if (!ev) { selRow.style.display = 'none'; return; }
   selRow.style.display = 'flex';
-  selNameEl.textContent = `${chordDisplayName(ev.rootPc, ev.type, ev.tensions)} に音を足す`;
+  selNameEl.textContent = `${chordDisplayName(ev.rootPc, ev.type, ev.tensions)} を調整`;
   tog7.classList.toggle('on', hasSeventh(ev.type));
   tog9.classList.toggle('on', (ev.tensions || []).includes('add9'));
+  octName.textContent = ev.octave;
+  const v = VOICINGS.find(x => x.id === (ev.voicing ?? 'root')) ?? VOICINGS[0];
+  voicingBtn.innerHTML = `積み方<small>${v.label}</small>`;
+  voicingBtn.classList.toggle('on', (ev.voicing ?? 'root') !== 'root');
 }
+
+// 音の積み方（転回形・開離）。同じコードでも重心が変わって響きが変わる。
+const VOICINGS = [
+  { id: 'root', label: '基本形' },
+  { id: 'first', label: '第1転回' },
+  { id: 'second', label: '第2転回' },
+  { id: 'spread', label: '開離' }
+];
+/** 選択中のコードを書き換えて、鳴らして、描き直す */
+function editSelChord(fn) {
+  const ev = findEvent(tl, 'chord', selected?.id);
+  if (!ev) return;
+  fn(ev);
+  if (bassMode === 'auto') rebuildBass();
+  activePresetId = null;
+  renderAll();
+  previewEvent('chord', ev);
+}
+octUp.addEventListener('click', () => editSelChord(ev => { ev.octave = Math.min(6, ev.octave + 1); }));
+octDown.addEventListener('click', () => editSelChord(ev => { ev.octave = Math.max(2, ev.octave - 1); }));
+voicingBtn.addEventListener('click', () => editSelChord(ev => {
+  const i = VOICINGS.findIndex(v => v.id === (ev.voicing ?? 'root'));
+  ev.voicing = VOICINGS[(i + 1) % VOICINGS.length].id;
+}));
 tog7.addEventListener('click', () => {
   const ev = findEvent(tl, 'chord', selected?.id);
   if (!ev) return;
@@ -486,8 +599,13 @@ function buildChordSuggest() {
     card.innerHTML = `
       <span class="role">${s.label}</span>
       <span class="pitch">${s.name}<small>${s.degree}</small></span>
-      <span class="hint">${s.hint}</span>`;
-    card.addEventListener('click', () => addChord(s.rootPc, s.type));
+      <span class="hint">${s.hint}</span>
+      <span class="try" title="追加せずに、流れだけ聴いてみる">🔊 流れで聴く</span>`;
+    card.addEventListener('click', (e) => {
+      // 「聴く」だけのときは追加しない（迷っている段階で並びを崩さないため）
+      if (e.target.closest('.try')) { previewProgression(last, s); return; }
+      addChord(s.rootPc, s.type);
+    });
     chordSuggestGridEl.appendChild(card);
   });
 }
@@ -568,7 +686,8 @@ function addLayerNote(pc, octave, startCount = null, lengthCount = null) {
   sortTrack(tl, activeLayer);
   selected = { track: activeLayer, id: ev.id };
   renderAll();
-  previewEvent(activeLayer, ev);
+  // 単音だけだとポツンと鳴って良し悪しがわからないので、コードの上で鳴らす
+  previewNoteOverChord(eventMidi(activeLayer, ev)[0], chordAtCount(tl.chord, start));
 }
 function backstepLayer() {
   const track = tl[activeLayer];
@@ -631,8 +750,10 @@ function buildSuggest() {
       <span class="role">${s.label}</span>
       <span class="pitch">${s.doremi ?? s.noteName}<small>${s.noteName}</small></span>
       <span class="hint">${s.hint}</span>
-      <span class="tagline">${s.isChordTone ? 'コードの音' : 'コード外の音'}</span>`;
-    card.addEventListener('click', () => {
+      <span class="tagline">${s.isChordTone ? 'コードの音' : 'コード外の音'}</span>
+      <span class="try" title="追加せずに、コードの上で鳴らしてみる">🔊 コードの上で聴く</span>`;
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.try')) { previewNoteOverChord(s.midi, chord); return; }
       const pc = ((s.midi % 12) + 12) % 12;
       addLayerNote(pc, Math.floor(s.midi / 12) - 1);
     });

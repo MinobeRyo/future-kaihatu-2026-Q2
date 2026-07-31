@@ -61,11 +61,12 @@ export async function loadInstrument(name = 'acoustic_grand_piano') {
  * 単発でコード/音を鳴らす（プレビュー・A/B試聴用）。
  * @param {number[]} midiNotes
  */
-export function playNow(midiNotes, { duration = 1.5, instrument = 'acoustic_grand_piano', gain = 1, ring = 'normal' } = {}) {
+export function playNow(midiNotes, { duration = 1.5, instrument = 'acoustic_grand_piano', gain = 1, ring = 'normal', delay = 0 } = {}) {
   const inst = instruments.get(instrument);
   if (!inst) return;
   const r = ringModeOf(ring);
-  const t = audioContext.currentTime;
+  // delay を指定すると少し先の時刻に予約する（「前のコード→次のコード」の試聴などに使う）
+  const t = audioContext.currentTime + delay;
   for (const midi of midiNotes) {
     const node = inst.play(midiToNoteName(midi), t, { duration, gain, release: r.release });
     activeNodes.push(node);
