@@ -33,11 +33,13 @@ let nextEventId = 1;
  * chordトラック: { rootPc, type, octave, startCount, lengthCount }
  * melody/bass:  単音。type は 'none' 固定
  */
-export function addEvent(tl, track, { rootPc, type = 'none', octave, startCount, lengthCount = 2, tensions = [], voicing = 'root' }) {
+export function addEvent(tl, track, { rootPc, type = 'none', octave, startCount, lengthCount = 2, tensions = [], voicing = 'root', isRest = false }) {
   const ev = {
     id: nextEventId++,
     rootPc,
     type: track === 'chord' ? type : 'none',
+    // 休符（無音で時間だけ占める）。コードトラックのみ。
+    isRest: track === 'chord' ? !!isRest : false,
     // テンション（add9/9th等）は chord トラックのみ保持。単音トラックは常に空。
     tensions: track === 'chord' ? [...tensions] : [],
     // ボイシング（転回形・開離）も chord トラックのみ
@@ -71,8 +73,57 @@ export function sortTrack(tl, track) {
   tl[track].sort((a, b) => a.startCount - b.startCount);
 }
 
-/** イベントの構成音（MIDI配列）を返す */
+/** 休符かどうか。休符は「鳴らない・和音として数えない」が、長さぶんの時間は占める。 */
+export function isRest(ev) {
+  return ev?.isRest === true;
+}
+
+/** 休符を除いた、実際に鳴るコードだけを返す（解析・提案・ベース生成はこちらを使う） */
+export function soundingChords(tl) {
+  return tl.chord.filter(ev => !isRest(ev));
+}
+
+/**
+ * コードトラックを「配列の並び順どおりに、隙間なく」並べ直す。
+ * 長さ変更・並び替え・休符の挿入/削除のあとは必ずこれを通す。
+ * startCount を配列順から機械的に決めるので、重なりや隙間が原理的に発生しない。
+ * @returns {number} 並べ終わった位置（＝コードトラックの終端カウント）
+ */
+export function relayoutChords(tl, startAt = 0) {
+  let t = startAt;
+  for (const ev of tl.chord) {
+    ev.startCount = t;
+    t += ev.lengthCount;
+  }
+  return t;
+}
+
+/**
+ * トラック内のイベントを配列上の別の位置へ動かす（並び替え）。
+ * 位置そのもの（startCount）は変えないので、コードトラックでは
+ * このあと relayoutChords() を呼んで並べ直すこと。
+ * @returns {boolean} 実際に動いたか
+ */
+export function reorderEvent(tl, track, id, newIndex) {
+  const arr = tl[track];
+  const from = arr.findIndex(e => e.id === id);
+  if (from < 0) return false;
+  const to = Math.max(0, Math.min(newIndex, arr.length - 1));
+  if (from === to) return false;
+  const [ev] = arr.splice(from, 1);
+  arr.splice(to, 0, ev);
+  return true;
+}
+
+/** イベントの長さを直接指定する（最小0.5カウント） */
+export function setEventLength(ev, lengthCount) {
+  ev.lengthCount = Math.max(0.5, lengthCount);
+  return ev.lengthCount;
+}
+
+/** イベントの構成音（MIDI配列）を返す。休符は音を持たないので空配列。 */
 export function eventMidi(track, ev) {
+  if (isRest(ev)) return [];
   if (track === 'chord') {
     return buildChord({
       rootPc: ev.rootPc, type: ev.type, octave: ev.octave,
@@ -116,12 +167,13 @@ export function toPlayableTracks(tl, instruments = {}) {
   return TRACKS.filter(t => tl[t].length > 0).map(t => ({
     instrument: instruments[t] ?? 'acoustic_grand_piano',
     gain: t === 'bass' ? 1.15 : t === 'chord' ? 0.9 : 1,
+    // 休符は midi が空になるので、再生イベントからは落とす（時間だけは既に確保済み）
     events: tl[t].map(ev => ({
       midi: eventMidi(t, ev),
       startCount: ev.startCount,
       lengthCount: ev.lengthCount
-    }))
-  }));
+    })).filter(e => e.midi.length > 0)
+  })).filter(tr => tr.events.length > 0);
 }
 
 /**

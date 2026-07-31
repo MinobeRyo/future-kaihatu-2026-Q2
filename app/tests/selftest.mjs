@@ -12,8 +12,12 @@ import {
 } from '../js/data/progressions.js';
 import {
   createTimeline, addEvent, eventMidi, transposeEvent, moveEvent,
-  toPlayableTracks, timelineEnd, pitchRange
+  toPlayableTracks, timelineEnd, pitchRange,
+  isRest, soundingChords, relayoutChords, reorderEvent, setEventLength, trackEnd
 } from '../js/core/timeline.js';
+import {
+  serializeSong, deserializeSong, SONG_FORMAT_VERSION, SONG_FILE_KIND, safeFileName
+} from '../js/core/songFile.js';
 import { findSimilarProgressions, matchMessage, songsForPattern } from '../js/data/songs.js';
 import { getMagicCircleRootRadius } from '../js/ui/magicCircle.js';
 import { PALETTE_TABS, paletteChords } from '../js/data/chordPalette.js';
@@ -699,6 +703,83 @@ check('各ベース音がコードのルートと一致',
 check('ベースを持たないプリセットは null', presetToBass(oudou, 0), null);
 check('基準オクターブ', BASS_BASE_OCTAVE, 2);
 setDisplayKey(0);
+
+
+console.log('--- コードの長さ・並び替え・休符 ---');
+{
+  const t = createTimeline();
+  const a = addEvent(t, 'chord', { rootPc: 0, type: 'major' });
+  const b = addEvent(t, 'chord', { rootPc: 7, type: 'major' });
+  const c = addEvent(t, 'chord', { rootPc: 9, type: 'minor' });
+  check('既定の長さは2カウントで詰めて並ぶ', t.chord.map(e => [e.startCount, e.lengthCount]),
+    [[0, 2], [2, 2], [4, 2]]);
+
+  // 長さを変えると後ろが自動で詰め直される
+  setEventLength(a, 4);
+  relayoutChords(t);
+  check('先頭を4拍にすると後ろがずれる', t.chord.map(e => e.startCount), [0, 4, 6]);
+  check('隙間も重なりも無い', trackEnd(t.chord), 8);
+  check('長さの下限は0.5', setEventLength(b, -3), 0.5);
+  setEventLength(b, 2); relayoutChords(t);
+
+  // 並び替え
+  check('末尾を先頭へ動かせる', reorderEvent(t, 'chord', c.id, 0), true);
+  check('並びが入れ替わる', t.chord.map(e => e.id), [c.id, a.id, b.id]);
+  relayoutChords(t);
+  check('並び替え後も詰まっている', t.chord.map(e => e.startCount), [0, 2, 6]);
+  check('同じ位置への移動は何もしない', reorderEvent(t, 'chord', c.id, 0), false);
+  check('存在しないidは false', reorderEvent(t, 'chord', 99999, 0), false);
+
+  // 休符
+  const r = addEvent(t, 'chord', { rootPc: 0, isRest: true, lengthCount: 2 });
+  relayoutChords(t);
+  check('休符と判定される', isRest(r), true);
+  check('休符は音を持たない', eventMidi('chord', r), []);
+  check('休符も時間は占める', trackEnd(t.chord), 10);
+  check('鳴るコードからは除かれる', soundingChords(t).length, 3);
+  check('休符は再生イベントに出ない', toPlayableTracks(t)[0].events.length, 3);
+  check('単音トラックでは休符にならない',
+    isRest(addEvent(t, 'melody', { rootPc: 0, octave: 5, isRest: true })), false);
+}
+
+console.log('--- 曲の保存形式 ---');
+{
+  const t = createTimeline();
+  addEvent(t, 'chord', { rootPc: 0, type: 'maj7', tensions: ['add9'], voicing: 'first' });
+  addEvent(t, 'chord', { rootPc: 5, isRest: true, lengthCount: 4 });
+  addEvent(t, 'melody', { rootPc: 4, octave: 5, lengthCount: 1 });
+  const doc = serializeSong({ tl: t, keyPc: 3, bpm: 132, title: 'テスト曲', bassMode: 'manual' });
+
+  check('種類の目印が入る', doc.kind, SONG_FILE_KIND);
+  check('バージョンが入る', doc.version, SONG_FORMAT_VERSION);
+  check('idは保存しない', 'id' in doc.tracks.chord[0], false);
+  check('JSONにして往復できる', typeof JSON.parse(JSON.stringify(doc)), 'object');
+
+  const back = deserializeSong(JSON.parse(JSON.stringify(doc)));
+  check('キーが戻る', back.keyPc, 3);
+  check('BPMが戻る', back.bpm, 132);
+  check('タイトルが戻る', back.title, 'テスト曲');
+  check('ベースの手動設定が戻る', back.bassMode, 'manual');
+  check('コード数が戻る', back.tl.chord.length, 2);
+  check('テンションが戻る', back.tl.chord[0].tensions, ['add9']);
+  check('積み方が戻る', back.tl.chord[0].voicing, 'first');
+  check('休符が戻る', isRest(back.tl.chord[1]), true);
+  check('メロディが戻る', back.tl.melody.length, 1);
+  check('読み込み時にidが振られる', typeof back.tl.chord[0].id, 'number');
+  check('読み込み時に位置が詰め直される', back.tl.chord.map(e => e.startCount), [0, 2]);
+
+  // 壊れた入力
+  const throws = (fn) => { try { fn(); return false; } catch (_) { return true; } };
+  check('nullは弾く', throws(() => deserializeSong(null)), true);
+  check('別のJSONは弾く', throws(() => deserializeSong({ foo: 1 })), true);
+  check('未来のバージョンは弾く',
+    throws(() => deserializeSong({ kind: SONG_FILE_KIND, version: 999 })), true);
+  check('トラックが無くても読める',
+    deserializeSong({ kind: SONG_FILE_KIND, version: 1 }).tl.chord.length, 0);
+  check('変な値は既定値に丸める',
+    deserializeSong({ kind: SONG_FILE_KIND, version: 1, keyPc: -1, bpm: 'x' }).bpm, 100);
+  check('ファイル名に使えない文字は落ちる', /[\\/:*?"<>|]/.test(safeFileName('a/b:c*d')), false);
+}
 
 console.log(`\n結果: ${pass} passed, ${fail} failed`);
 process.exit(fail > 0 ? 1 : 0);

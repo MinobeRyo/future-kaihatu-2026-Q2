@@ -31,8 +31,10 @@ import {
 } from '../core/suggest.js';
 import {
   createTimeline, addEvent, eventMidi, findEvent, removeEvent, sortTrack, withId,
-  moveEvent, transposeEvent, resizeEvent, trackEnd, timelineEnd, toPlayableTracks
+  moveEvent, transposeEvent, resizeEvent, trackEnd, timelineEnd, toPlayableTracks,
+  isRest, soundingChords, relayoutChords, setEventLength
 } from '../core/timeline.js';
+import { serializeSong, downloadSong, readSongFile } from '../core/songFile.js';
 
 // ---------- 定数・見た目 ----------
 const COUNT_W = 56;   // 1カウントの横幅(px)
@@ -71,7 +73,19 @@ const DOREMI = [
   { off: 5, label: 'ファ' }, { off: 7, label: 'ソ' }, { off: 9, label: 'ラ' },
   { off: 11, label: 'シ' }
 ];
-const LEN_TABS = [{ label: 'みじかい', val: 1 }, { label: 'ながい', val: 2 }];
+// メロディ/ベースを1音置くときの長さ（カウント＝拍）。
+// 以前は「みじかい/ながい」というラベルだったが、フッターの「のび」（余韻）と
+// 区別がつかず「音の伸び方の設定」と誤解されるので、拍数をそのまま出す。
+const MEL_LENS = [0.5, 1, 2, 4];
+const MEL_LEN_KEY = 'composeMelLen';
+// コード1つ／休符1つの長さ（カウント＝拍）。ステッパーはこの段階を行き来する。
+const CHORD_LENS = [1, 2, 3, 4, 6, 8];
+/** いちばん近い段階のインデックス（プリセット等で段階外の値が入っていても迷子にならない） */
+function lenIndex(len) {
+  let best = 0, bestD = Infinity;
+  CHORD_LENS.forEach((v, i) => { const d = Math.abs(v - len); if (d < bestD) { bestD = d; best = i; } });
+  return best;
+}
 const INSTRUMENTS = [
   { label: 'ピアノ', name: 'acoustic_grand_piano' },
   { label: 'ギター', name: 'acoustic_guitar_nylon' },
@@ -88,12 +102,20 @@ const layerOf = (id) => LAYERS.find(l => l.id === id) ?? LAYERS[0];
 // 提案カードの役割 → 色クラス
 const ROLE_CLASS = { lift: 'r-lift', settle: 'r-settle', step: 'r-step', color: 'r-color', flow: 'r-flow' };
 
+// ---------- アイコン ----------
+// 四分休符の記号。Unicodeの 𝄽 (U+1D13D) は搭載フォントが少なく、
+// 多くの環境で豆腐（□）になってしまうので、自前のSVGで描く。
+const REST_MARK = (cls = '') => `<svg class="restmark ${cls}" viewBox="0 0 74 212" aria-hidden="true"><path d="M22 6C24 2 30 2 32 7L60 62C62 66 61 70 58 73L30 100C27 103 27 107 29 111L64 168C66 172 64 176 60 175C44 171 30 178 30 190C30 196 33 200 37 203C39 205 37 208 34 206C20 197 12 184 12 170C12 154 26 146 40 148C43 148 44 145 42 142L10 92C7 88 8 84 11 81L40 54C43 51 43 47 41 43L18 14C15 10 20 8 22 6Z"/></svg>`;
+// 削除の✕。文字の ✕ はフォントによって太さ・大きさが揃わないので線で描く。
+const CLOSE_MARK = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6.6 6.6 13.4 13.4M13.4 6.6 6.6 13.4"/></svg>';
+
 // ---------- DOM ----------
 const $ = (id) => document.getElementById(id);
 const presetsEl = $('presets');
 const cardsEl = $('cards');
 const selRow = $('selRow'), selNameEl = $('selName'), tog7 = $('tog7'), tog9 = $('tog9'), delChord = $('delChord');
 const octUp = $('octUp'), octDown = $('octDown'), octName = $('octName'), voicingBtn = $('voicingBtn');
+const lenUp = $('lenUp'), lenDown = $('lenDown'), lenName = $('lenName');
 const diagBtn = $('diagBtn'), diagResult = $('diagResult');
 const chordSuggestGridEl = $('chordSuggestGrid'), chordSuggestCtxEl = $('chordSuggestCtx');
 const layerTabsEl = $('layerTabs'), bassModeEl = $('bassMode');
@@ -109,6 +131,7 @@ const noteUp = $('noteUp'), noteDown = $('noteDown'), noteLen = $('noteLen'), no
 const keyName = $('keyName'), keyUp = $('keyUp'), keyDown = $('keyDown');
 const playBtn = $('playBtn'), bpmRange = $('bpmRange'), bpmLabel = $('bpmLabel'), loopBtn = $('loopBtn');
 const instTabs = $('instTabs'), ringTabs = $('ringTabs');
+const saveSongBtn = $('saveSong'), loadSongBtn = $('loadSong'), songFileInput = $('songFileInput');
 
 // ---------- 状態 ----------
 let tl = createTimeline();
@@ -122,7 +145,18 @@ let activePresetId = null;
 let activeLayer = 'melody'; // ピアノロール・ドレミ・提案パネルの操作対象
 let bassMode = 'auto';      // 'auto' = コードのルートから自動生成 / 'manual' = ユーザーが編集した
 let melStyle = MELODY_STYLES[0].id;
-let melLen = 1;             // ドレミ入力・クリック追加の長さ
+let melLen = loadMelLen();  // ドレミ入力・クリック追加の長さ（拍）。前回選んだ値を覚えている
+/** 前回選んだ長さを読み込む（保存が使えない環境なら既定値） */
+function loadMelLen() {
+  try {
+    const v = Number(localStorage.getItem(MEL_LEN_KEY));
+    if (MEL_LENS.includes(v)) return v;
+  } catch (_) { /* プライベートモード等は無視 */ }
+  return 1;
+}
+function saveMelLen(v) {
+  try { localStorage.setItem(MEL_LEN_KEY, String(v)); } catch (_) { /* 無視 */ }
+}
 let chordInstrument = INSTRUMENTS[0].name;
 let ringMode = 'normal';    // 音の「のび」（余韻の長さ）
 let loopOn = false;
@@ -208,7 +242,8 @@ const BASS_PULL = 0.35;                     // 基準の高さへ戻ろうとす
 function rebuildBass() {
   if (bassMode !== 'auto') return;
   let prev = BASS_HOME;
-  tl.bass = [...tl.chord]
+  // 休符の区間はベースも鳴らさない（＝そこだけ音が空く）
+  tl.bass = soundingChords(tl)
     .sort((a, b) => a.startCount - b.startCount)
     .map(c => {
       const midi = nearestMidiInRange(c.rootPc, prev, BASS_RANGE);
@@ -314,6 +349,7 @@ function loadPreset(id) {
     bassMode = 'auto';
     rebuildBass();
   }
+  relayoutChords(tl);
   activePresetId = id;
   selected = null;
   diagResult.textContent = '';
@@ -334,24 +370,47 @@ function chordDegreeLabels(ev) {
 
 function buildCards() {
   cardsEl.innerHTML = '';
-  const chords = [...tl.chord].sort((a, b) => a.startCount - b.startCount);
-  chords.forEach(ev => {
-    const off = ((ev.rootPc - keyPc) % 12 + 12) % 12;
+  // 並び順は配列の順そのもの（relayoutChords が startCount を必ず順番どおりに振り直すため、
+  // startCount でソートし直す必要はない。ドラッグ中の見た目とも一致する）
+  tl.chord.forEach(ev => {
+    const sel = selected?.track === 'chord' && selected.id === ev.id ? ' sel' : '';
     const card = document.createElement('div');
-    card.className = `cv2-card ${qClass(ev.type)}` + (selected?.track === 'chord' && selected.id === ev.id ? ' sel' : '');
-    card.innerHTML = `
-      <div class="top">
-        <span class="deg">${degreeToRoman(off, ev.type)}</span>
-        <button class="rm" title="削除">✕</button>
-      </div>
-      <div class="name">${chordDisplayName(ev.rootPc, ev.type, ev.tensions)}${altTag(chordAltName(ev.rootPc, ev.type, ev.tensions))}</div>
-      <div class="feel">${FEEL[ev.type] ?? ''}</div>
-      <div class="notes">${chordNoteLetters(ev)}</div>
-      <div class="degs" title="${degreeMeaningList(ev.rootPc, ev.type, ev.tensions ?? [])}">${chordDegreeLabels(ev)}</div>`;
+    card.dataset.id = ev.id;
+    // 長さバッジはカード右下に絶対配置する（上の行に入れると、度数と✕を押しつぶすため）
+    const lenChip = `<span class="lenchip" title="鳴っている長さ">${fmtLen(ev.lengthCount)}</span>`;
+    if (isRest(ev)) {
+      card.className = 'cv2-card rest' + sel;
+      card.innerHTML = `
+        <div class="top">
+          <span class="deg">休符</span>
+          <button class="rm" title="削除">${CLOSE_MARK}</button>
+        </div>
+        <div class="restbody">
+          ${REST_MARK()}
+          <span class="lb">音を鳴らさない<br>「間」</span>
+        </div>
+        ${lenChip}`;
+    } else {
+      const off = ((ev.rootPc - keyPc) % 12 + 12) % 12;
+      card.className = `cv2-card ${qClass(ev.type)}` + sel;
+      card.innerHTML = `
+        <div class="top">
+          <span class="deg">${degreeToRoman(off, ev.type)}</span>
+          <button class="rm" title="削除">${CLOSE_MARK}</button>
+        </div>
+        <div class="name">${chordDisplayName(ev.rootPc, ev.type, ev.tensions)}${altTag(chordAltName(ev.rootPc, ev.type, ev.tensions))}</div>
+        <div class="feel">${FEEL[ev.type] ?? ''}</div>
+        <div class="notes">${chordNoteLetters(ev)}</div>
+        <div class="degs" title="${degreeMeaningList(ev.rootPc, ev.type, ev.tensions ?? [])}">${chordDegreeLabels(ev)}</div>
+        ${lenChip}`;
+    }
     card.addEventListener('click', (e) => {
+      // 並べ替えのドラッグ直後は、選択・試聴に化けさせない
+      if (suppressCardClick) { suppressCardClick = false; return; }
       if (e.target.closest('.rm')) { removeChord(ev.id); return; }
       selectChord(ev.id);
     });
+    attachCardDrag(card, ev.id);
     cardsEl.appendChild(card);
   });
 
@@ -365,6 +424,19 @@ function buildCards() {
   wrap.appendChild(add);
   if (paletteOpen) wrap.appendChild(buildPalette());
   cardsEl.appendChild(wrap);
+
+  // ＋休符（音を止めたい所に「間」を置く）
+  const rest = document.createElement('button');
+  rest.className = 'cv2-add rest';
+  rest.title = '音を鳴らさない「間」を足します（長さはあとから変えられます）';
+  rest.innerHTML = `${REST_MARK('big')}<span class="txt">休符</span>`;
+  rest.addEventListener('click', addRestChord);
+  cardsEl.appendChild(rest);
+}
+
+/** 長さの表示（1拍 / 1.5拍 のように） */
+function fmtLen(len) {
+  return `${Number.isInteger(len) ? len : len.toFixed(1)}拍`;
 }
 
 // タブ式のコードパレット。定義は data/chordPalette.js 側に置いてある。
@@ -506,18 +578,43 @@ function previewCustom() {
   previewEvent('chord', { rootPc: customRoot, type: customType, tensions: [...customTensions], octave: 4, lengthCount: 2 });
 }
 
+/**
+ * コード列に変更を加えたあとの共通後始末。
+ * 長さ・並び順・休符が絡むと startCount を手で管理しきれないので、
+ * 「配列の並び＝曲の並び」と決めて、位置は毎回 relayoutChords で振り直す。
+ */
+function afterChordEdit() {
+  relayoutChords(tl);
+  rebuildBass();
+  activePresetId = null;
+  renderAll();
+}
+
 function addChord(rootPc, type, tensions = []) {
   const ev = addEvent(tl, 'chord', { rootPc, type, octave: 4, startCount: trackEnd(tl.chord), lengthCount: 2, tensions });
+  relayoutChords(tl);
   rebuildBass();
   activePresetId = null;
   selectChord(ev.id);
 }
+/** 休符を1つ足す。選択中のコードがあればその直後、無ければ末尾に置く。 */
+function addRestChord() {
+  const ev = addEvent(tl, 'chord', { rootPc: keyPc, type: 'none', lengthCount: 2, isRest: true });
+  if (selected?.track === 'chord') {
+    const at = tl.chord.findIndex(e => e.id === selected.id);
+    if (at >= 0) {
+      tl.chord.pop();
+      tl.chord.splice(at + 1, 0, ev);
+    }
+  }
+  afterChordEdit();
+  selected = { track: 'chord', id: ev.id };
+  renderAll();
+}
 function removeChord(id) {
   removeEvent(tl, 'chord', id);
-  rebuildBass();
   if (selected?.track === 'chord' && selected.id === id) selected = null;
-  activePresetId = null;
-  renderAll();
+  afterChordEdit();
 }
 function selectChord(id) {
   selected = { track: 'chord', id };
@@ -525,11 +622,112 @@ function selectChord(id) {
   previewEvent('chord', findEvent(tl, 'chord', id));
 }
 
-// 選択コードの操作行（7th / 9th / 削除）
+/** 選択中のコード／休符の長さを1段階ずらす（後ろのコードは自動で詰め直される） */
+function stepChordLength(delta) {
+  if (selected?.track !== 'chord') return;
+  const ev = findEvent(tl, 'chord', selected.id);
+  if (!ev) return;
+  const i = Math.max(0, Math.min(CHORD_LENS.length - 1, lenIndex(ev.lengthCount) + delta));
+  const next = CHORD_LENS[i];
+  if (next === ev.lengthCount) return;
+  setEventLength(ev, next);
+  afterChordEdit();
+  previewEvent('chord', ev);   // 休符は音を持たないので、その場合は何も鳴らない
+}
+lenUp.addEventListener('click', () => stepChordLength(+1));
+lenDown.addEventListener('click', () => stepChordLength(-1));
+
+// ------------------------------------------------------------
+// コードカードの並べ替え（ドラッグ＆ドロップ）
+// HTML5 の draggable はタッチ端末で動かないので、pointer イベントで自前に実装する。
+// ドラッグ中は DOM のカードそのものを差し替えて見た目を先に更新し、
+// 指を離した時点の DOM の並びを tl.chord に書き戻す。
+// ------------------------------------------------------------
+let cardDrag = null;
+let suppressCardClick = false;
+
+function attachCardDrag(card, id) {
+  card.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('.rm')) return;         // 削除ボタンはドラッグ対象外
+    if (e.button !== undefined && e.button !== 0) return;
+    cardDrag = { id, el: card, x0: e.clientX, y0: e.clientY, started: false };
+  });
+}
+
+document.addEventListener('pointermove', (e) => {
+  if (!cardDrag) return;
+  if (!cardDrag.started) {
+    // 少し動かして初めてドラッグ扱いにする（タップでの選択を邪魔しない）
+    if (Math.abs(e.clientX - cardDrag.x0) + Math.abs(e.clientY - cardDrag.y0) < 6) return;
+    cardDrag.started = true;
+    cardDrag.el.classList.add('dragging');
+    cardsEl.classList.add('reordering');
+  }
+  e.preventDefault();
+  const others = [...cardsEl.querySelectorAll('.cv2-card')].filter(c => c !== cardDrag.el);
+  if (others.length === 0) return;
+  // ポインタにいちばん近いカードを見つけ、その左半分なら前・右半分なら後ろに差し込む
+  let best = null, bestD = Infinity;
+  for (const c of others) {
+    const r = c.getBoundingClientRect();
+    const dx = e.clientX - (r.left + r.width / 2);
+    const dy = e.clientY - (r.top + r.height / 2);
+    const d = dx * dx + dy * dy;
+    if (d < bestD) { bestD = d; best = c; }
+  }
+  const r = best.getBoundingClientRect();
+  if (e.clientX < r.left + r.width / 2) cardsEl.insertBefore(cardDrag.el, best);
+  else cardsEl.insertBefore(cardDrag.el, best.nextSibling);
+});
+
+document.addEventListener('pointerup', () => {
+  if (!cardDrag) return;
+  const d = cardDrag;
+  cardDrag = null;
+  d.el.classList.remove('dragging');
+  cardsEl.classList.remove('reordering');
+  if (!d.started) return;                 // 動かしていない＝ふつうのタップ
+  suppressCardClick = true;
+  setTimeout(() => { suppressCardClick = false; }, 0);   // click が来ない場合の保険
+  applyCardOrder([...cardsEl.querySelectorAll('.cv2-card')].map(c => Number(c.dataset.id)));
+});
+document.addEventListener('pointercancel', () => {
+  if (!cardDrag) return;
+  cardDrag.el.classList.remove('dragging');
+  cardsEl.classList.remove('reordering');
+  cardDrag = null;
+  renderAll();
+});
+
+/** DOM上のカードの並びを tl.chord に反映する */
+function applyCardOrder(ids) {
+  const map = new Map(tl.chord.map(e => [e.id, e]));
+  const next = ids.map(id => map.get(id)).filter(Boolean);
+  if (next.length !== tl.chord.length) { renderAll(); return; }  // 取りこぼしたら描き直すだけ
+  tl.chord = next;
+  afterChordEdit();
+}
+
+// 選択コードの操作行（長さ / 7th / 9th / 高さ / 積み方 / 削除）
 function updateSelRow() {
   const ev = selected?.track === 'chord' ? findEvent(tl, 'chord', selected.id) : null;
   if (!ev) { selRow.style.display = 'none'; return; }
   selRow.style.display = 'flex';
+
+  // 長さは休符にも効く（共通）
+  lenName.textContent = fmtLen(ev.lengthCount);
+  const li = lenIndex(ev.lengthCount);
+  lenDown.disabled = li <= 0;
+  lenUp.disabled = li >= CHORD_LENS.length - 1;
+
+  // 休符には和音の設定が無いので、コード専用の操作は隠す
+  const rest = isRest(ev);
+  selRow.querySelectorAll('.cv2-chordonly').forEach(el => { el.style.display = rest ? 'none' : ''; });
+  if (rest) {
+    selNameEl.textContent = '休符（無音）を調整';
+    return;
+  }
+
   selNameEl.textContent = `${chordDisplayName(ev.rootPc, ev.type, ev.tensions)} を調整`;
   tog7.classList.toggle('on', hasSeventh(ev.type));
   tog9.classList.toggle('on', (ev.tensions || []).includes('add9'));
@@ -585,8 +783,9 @@ delChord.addEventListener('click', () => { if (selected?.track === 'chord') remo
 // ------------------------------------------------------------
 function buildChordSuggest() {
   chordSuggestGridEl.innerHTML = '';
-  const list = suggestNextChords({ chords: tl.chord, keyPc });
-  const chords = [...tl.chord].sort((a, b) => a.startCount - b.startCount);
+  // 提案・診断は「鳴っているコードの流れ」だけを見る（休符は進行の一部ではない）
+  const chords = soundingChords(tl).sort((a, b) => a.startCount - b.startCount);
+  const list = suggestNextChords({ chords, keyPc });
   const last = chords[chords.length - 1];
 
   chordSuggestCtxEl.textContent = last
@@ -612,7 +811,7 @@ function buildChordSuggest() {
 
 // 逆引き診断
 diagBtn.addEventListener('click', () => {
-  const chords = [...tl.chord].sort((a, b) => a.startCount - b.startCount);
+  const chords = soundingChords(tl).sort((a, b) => a.startCount - b.startCount);
   if (chords.length === 0) { diagResult.textContent = 'まずコードをならべてね'; return; }
   const results = findSimilarProgressions(chords);
   diagResult.textContent = results.length > 0 ? matchMessage(results[0]) : matchMessage(null);
@@ -641,17 +840,18 @@ function chordTonePcs(ev) {
 // ============================================================
 function buildLenTabs() {
   lenTabsEl.innerHTML = '';
-  LEN_TABS.forEach(t => {
+  MEL_LENS.forEach(v => {
     const b = document.createElement('button');
-    b.className = 'cv2-lentab' + (t.val === melLen ? ' on' : '');
-    b.textContent = t.label;
-    b.addEventListener('click', () => { melLen = t.val; buildLenTabs(); });
+    b.className = 'cv2-lentab' + (v === melLen ? ' on' : '');
+    b.textContent = fmtLen(v);
+    b.title = `1音を${fmtLen(v)}ぶんの長さで置きます（ピアノロールでの横のはば）`;
+    b.addEventListener('click', () => { melLen = v; saveMelLen(v); buildLenTabs(); });
     lenTabsEl.appendChild(b);
   });
 }
 function buildDoremi() {
   doremiEl.innerHTML = '';
-  const tones = chordTonePcs(chordAtCount(tl.chord, cursorCount()));
+  const tones = chordTonePcs(chordAtCount(soundingChords(tl), cursorCount()));
   DOREMI.forEach(d => {
     const pc = (keyPc + d.off) % 12;
     const b = document.createElement('button');
@@ -662,7 +862,7 @@ function buildDoremi() {
   });
   const rest = document.createElement('button');
   rest.className = 'cv2-note-btn util';
-  rest.innerHTML = '<span class="lab">𝄽</span><span class="sub">休み</span>';
+  rest.innerHTML = `<span class="lab">${REST_MARK('mid')}</span><span class="sub">休み</span>`;
   rest.addEventListener('click', addRest);
   doremiEl.appendChild(rest);
   const back = document.createElement('button');
@@ -687,7 +887,7 @@ function addLayerNote(pc, octave, startCount = null, lengthCount = null) {
   selected = { track: activeLayer, id: ev.id };
   renderAll();
   // 単音だけだとポツンと鳴って良し悪しがわからないので、コードの上で鳴らす
-  previewNoteOverChord(eventMidi(activeLayer, ev)[0], chordAtCount(tl.chord, start));
+  previewNoteOverChord(eventMidi(activeLayer, ev)[0], chordAtCount(soundingChords(tl), start));
 }
 function backstepLayer() {
   const track = tl[activeLayer];
@@ -724,15 +924,16 @@ function updateStyleDesc() {
 
 function buildSuggest() {
   suggestGridEl.innerHTML = '';
-  if (tl.chord.length === 0) {
+  const sounding = soundingChords(tl);
+  if (sounding.length === 0) {
     suggestCtxEl.textContent = '';
     suggestGridEl.innerHTML = '<div class="cv2-suggest-empty">さきにコードをならべると、次に置くとよい音を提案します</div>';
     return;
   }
   const cur = cursorCount();
-  const chord = chordAtCount(tl.chord, cur);
+  const chord = chordAtCount(sounding, cur);
   const layer = layerOf(activeLayer);
-  const opts = { chords: tl.chord, keyPc, cursorCount: cur, prevMidi: lastMidi(), range: layer.range };
+  const opts = { chords: sounding, keyPc, cursorCount: cur, prevMidi: lastMidi(), range: layer.range };
   const list = activeLayer === 'bass' ? suggestBassNotes(opts) : suggestMelodyNotes(opts);
 
   suggestCtxEl.textContent = chord
@@ -766,12 +967,12 @@ function buildSuggest() {
 // ============================================================
 autoMelBtn.addEventListener('click', autoGenerate);
 function autoGenerate() {
-  if (tl.chord.length === 0) { diagResult.textContent = 'さきにコードをならべてね'; return; }
+  if (soundingChords(tl).length === 0) { diagResult.textContent = 'さきにコードをならべてね'; return; }
   const layer = layerOf(activeLayer);
   if (activeLayer === 'bass') markBassManual();
 
   const notes = generateMelody({
-    chords: tl.chord,
+    chords: soundingChords(tl),
     keyPc,
     style: melStyle,
     range: layer.range
@@ -832,8 +1033,13 @@ function renderRoll() {
   rollRegions.style.width = `${totalW}px`;
   let rg = '';
   [...tl.chord].sort((a, b) => a.startCount - b.startCount).forEach(ev => {
+    const geo = `left:${ev.startCount * COUNT_W}px; width:${ev.lengthCount * COUNT_W - 2}px;`;
+    if (isRest(ev)) {
+      rg += `<div class="cv2-roll-region rest" style="${geo}" title="休符（無音）">${REST_MARK('mini')}休み</div>`;
+      return;
+    }
     const off = ((ev.rootPc - keyPc) % 12 + 12) % 12;
-    rg += `<div class="cv2-roll-region" style="left:${ev.startCount * COUNT_W}px; width:${ev.lengthCount * COUNT_W - 2}px; background:${ROLL_BLOCK_COLOR[qClass(ev.type)]};">${degreeToRoman(off, ev.type)} ${chordDisplayName(ev.rootPc, ev.type, ev.tensions)}</div>`;
+    rg += `<div class="cv2-roll-region" style="${geo} background:${ROLL_BLOCK_COLOR[qClass(ev.type)]};">${degreeToRoman(off, ev.type)} ${chordDisplayName(ev.rootPc, ev.type, ev.tensions)}</div>`;
   });
   rollRegions.innerHTML = rg;
 
@@ -894,11 +1100,15 @@ function updateNoteSelRow() {
   melSelRow.style.display = 'flex';
   const m = eventMidi(track, ev)[0];
   melSelLabel.textContent = `${layerOf(track).label}の「${midiDisplayName(m)}」を`;
-  noteLen.textContent = `⟷ 長さ（${ev.lengthCount}）`;
+  noteLen.textContent = `⟷ 長さ（${fmtLen(ev.lengthCount)}）`;
 }
 noteUp.addEventListener('click', () => editSelNote(ev => transposeEvent(ev, 1)));
 noteDown.addEventListener('click', () => editSelNote(ev => transposeEvent(ev, -1)));
-noteLen.addEventListener('click', () => editSelNote(ev => { ev.lengthCount = ({ 0.5: 1, 1: 2, 2: 4, 4: 0.5 })[ev.lengthCount] ?? 1; }));
+// 押すたびに 0.5 → 1 → 2 → 4 → 0.5 と一周する（ドレミ入力の選択肢と同じ段階）
+noteLen.addEventListener('click', () => editSelNote(ev => {
+  const i = MEL_LENS.indexOf(ev.lengthCount);
+  ev.lengthCount = MEL_LENS[(i + 1) % MEL_LENS.length] ?? 1;
+}));
 noteDel.addEventListener('click', () => {
   const track = selected?.track;
   if (track !== 'melody' && track !== 'bass') return;
@@ -1024,7 +1234,7 @@ document.addEventListener('keydown', (e) => {
 // ============================================================
 function transposeAll(semi) {
   keyPc = ((keyPc + semi) % 12 + 12) % 12;
-  tl.chord.forEach(ev => transposeEvent(ev, semi));
+  tl.chord.forEach(ev => { if (!isRest(ev)) transposeEvent(ev, semi); });
   tl.melody.forEach(ev => transposeEvent(ev, semi));
   // 自動モードのベースは rebuildBass で作り直されるので、手動のときだけ移調する
   if (bassMode === 'manual') tl.bass.forEach(ev => transposeEvent(ev, semi));
@@ -1106,6 +1316,86 @@ function buildInstTabs() {
     });
     instTabs.appendChild(b);
   });
+}
+
+// ============================================================
+// 曲の保存 / 読み込み（仮実装: JSONファイル）
+// 状態 ⇄ 保存用オブジェクトの変換は core/songFile.js に置いてある。
+// 将来 DB 保存にするときは、downloadSong / readSongFile の呼び出しを
+// サーバーとの通信に差し替えるだけで済む（serializeSong の結果をそのまま送る）。
+// ============================================================
+let songTitle = '';
+
+/** いまのアプリの状態を、保存用オブジェクトにまとめる */
+function currentSongDoc(title) {
+  return serializeSong({
+    tl, keyPc, title,
+    bpm: Number(bpmRange.value),
+    ringMode, chordInstrument, melStyle, bassMode
+  });
+}
+
+saveSongBtn.addEventListener('click', () => {
+  if (timelineEnd(tl) === 0) { toast('まだ何も無いので、保存できません', true); return; }
+  const suggested = songTitle || PROGRESSION_PRESETS.find(p => p.id === activePresetId)?.name || '';
+  const title = window.prompt('曲の名前をつけてください（そのままでもOK）', suggested);
+  if (title === null) return;   // キャンセル
+  songTitle = title.trim();
+  downloadSong(currentSongDoc(songTitle));
+  toast('ファイルに書き出しました');
+});
+
+loadSongBtn.addEventListener('click', () => { songFileInput.value = ''; songFileInput.click(); });
+
+songFileInput.addEventListener('change', async () => {
+  const file = songFileInput.files?.[0];
+  if (!file) return;
+  try {
+    const song = await readSongFile(file);
+    applySong(song);
+    toast(`「${song.title || file.name}」を読み込みました`);
+  } catch (err) {
+    toast(`読み込めませんでした: ${err.message}`, true);
+  }
+});
+
+/** 読み込んだ曲をアプリの状態に反映する */
+function applySong(song) {
+  stopPlay();
+  tl = song.tl;
+  keyPc = song.keyPc;
+  songTitle = song.title;
+  bassMode = song.bassMode;
+  melStyle = MELODY_STYLES.some(s => s.id === song.melStyle) ? song.melStyle : melStyle;
+  ringMode = RING_MODES.some(r => r.id === song.ringMode) ? song.ringMode : ringMode;
+  if (INSTRUMENTS.some(i => i.name === song.chordInstrument)) chordInstrument = song.chordInstrument;
+  bpmRange.value = String(song.bpm);
+  bpmLabel.textContent = String(song.bpm);
+  selected = null;
+  activePresetId = null;
+  restPad.melody = 0; restPad.bass = 0;
+  diagResult.textContent = '';
+  updateKeyLabel();
+  buildStyleTabs(); updateStyleDesc(); buildInstTabs(); buildRingTabs();
+  renderAll();
+  loadInstrument(chordInstrument).catch(() => {});
+}
+
+/** 画面下に数秒だけ出る通知（保存・読み込みの結果を伝えるだけの軽い表示） */
+let toastTimer = null;
+function toast(msg, isError = false) {
+  let el = document.getElementById('cv2Toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'cv2Toast';
+    el.className = 'cv2-toast';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.classList.toggle('err', isError);
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
 }
 
 // ============================================================

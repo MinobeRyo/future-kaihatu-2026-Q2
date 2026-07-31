@@ -11,22 +11,28 @@
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/compose.css">
 </head>
-<body>
+<body class="v2">
+
+<!-- ヘッダーは全ページ共通（他ページと同じ markup。変えるときは全ページ揃えること）。
+     作曲モードだけの操作（キー・保存・開く）は、下の cv2-songbar に置く。 -->
+<header class="app-nav">
+  <span class="brand">🎹 積み音</span>
+  <a href="tutorial.html">入門</a>
+  <a href="index.html">練習</a>
+  <a href="compose.html" class="active">作曲</a>
+  <a href="learn.html">解説</a>
+  <a href="魔法陣.html">魔法陣</a>
+  <a href="compare.html">聴き比べ</a>
+  <button id="themeToggle" type="button" aria-label="テーマ切り替え">🌙</button>
+</header>
+
 <div class="cv2">
 
-  <!-- ヘッダー: ブランド＋サイトナビ＋キー操作＋テーマ -->
-  <header class="cv2-header">
-    <div class="cv2-header-inner">
-      <a href="index.html" class="cv2-brand"><span class="dot"></span>作曲</a>
-      <nav class="cv2-nav">
-        <a href="tutorial.html">入門</a>
-        <a href="index.html">練習</a>
-        <a href="compose.html" class="active">作曲</a>
-        <a href="learn.html">解説</a>
-        <a href="魔法陣.html">魔法陣</a>
-        <a href="compare.html">聴き比べ</a>
-      </nav>
-      <div class="cv2-spacer"></div>
+  <main class="cv2-main">
+
+    <!-- 曲ぜんたいの設定（作曲モード限定なので共通ヘッダーには置かない）。
+         保存/開くはいまはJSONファイル。将来はDB保存に差し替え予定 -->
+    <div class="cv2-songbar">
       <div class="cv2-key">
         <span class="lbl">キー</span>
         <div class="stepper">
@@ -35,17 +41,17 @@
           <button id="keyUp" type="button" aria-label="キーを上げる">›</button>
         </div>
       </div>
-      <button id="themeToggle" class="cv2-theme" type="button" aria-label="テーマ切り替え">🌙</button>
+      <div class="cv2-spacer"></div>
+      <button id="saveSong" class="cv2-filebtn" type="button" title="いまの曲をファイルに書き出します">保存</button>
+      <button id="loadSong" class="cv2-filebtn" type="button" title="書き出したファイルを読み込みます">開く</button>
+      <input type="file" id="songFileInput" accept=".json,application/json" hidden>
     </div>
-  </header>
-
-  <main class="cv2-main">
 
     <!-- STEP 1: コード -->
     <div class="cv2-step">
       <span class="badge b1">1</span>
       <span class="title">コードをならべる</span>
-      <span class="desc">テンプレを選ぶ・カードをタップで試聴・「＋」で足す</span>
+      <span class="desc">テンプレを選ぶ・カードをタップで試聴・「＋」で足す・カードをドラッグで並べ替え</span>
     </div>
 
     <div class="cv2-presets" id="presets"></div>
@@ -64,11 +70,20 @@
       <!-- 選択コードの操作（7th / 9th / 削除） -->
       <div class="cv2-selrow" id="selRow" style="display:none;">
         <span class="lbl" id="selName"></span>
-        <div style="display:flex; gap:9px;">
+        <div class="cv2-chordonly cv2-togrow" id="chordOnlyTogs">
           <button class="cv2-tog" id="tog7">7th<small>大人っぽく</small></button>
           <button class="cv2-tog" id="tog9">9th<small>浮遊感</small></button>
         </div>
-        <div class="cv2-octave">
+        <!-- 鳴っている長さ（拍数）。変えると後ろのコードは自動で詰め直されます -->
+        <div class="cv2-octave cv2-len">
+          <span class="lbl">長さ</span>
+          <div class="stepper">
+            <button id="lenDown" type="button" title="短くする">‹</button>
+            <span class="name" id="lenName">2拍</span>
+            <button id="lenUp" type="button" title="長くする">›</button>
+          </div>
+        </div>
+        <div class="cv2-octave cv2-chordonly" id="octBox">
           <span class="lbl">高さ</span>
           <div class="stepper">
             <button id="octDown" type="button" title="1オクターブ下げる">‹</button>
@@ -76,7 +91,7 @@
             <button id="octUp" type="button" title="1オクターブ上げる">›</button>
           </div>
         </div>
-        <button class="cv2-tog" id="voicingBtn" title="音の積み方を変える（響きの重心が変わります）">積み方</button>
+        <button class="cv2-tog cv2-chordonly" id="voicingBtn" title="音の積み方を変える（響きの重心が変わります）">積み方</button>
         <div class="cv2-spacer"></div>
         <button class="cv2-del" id="delChord">✕ 削除</button>
       </div>
@@ -131,7 +146,9 @@
           <span class="t">ドレミで1音ずつ足す</span>
           <span class="hint">● 光っている音が、今のコードに合う音</span>
           <div class="cv2-spacer"></div>
-          <span class="len-lbl">長さ</span>
+          <!-- 「長さ」＝ピアノロールでの横のはば（拍数）。
+               フッターの「のび」（余韻）と混同されやすいので、拍数をそのまま出す -->
+          <span class="len-lbl" title="1音を何拍ぶんの長さで置くか。音の余韻はフッターの「のび」で変えます">1音の長さ</span>
           <div class="cv2-lentabs" id="lenTabs"></div>
         </div>
         <div class="cv2-doremi" id="doremi"></div>
@@ -182,7 +199,7 @@
       <button class="cv2-loop" id="loopBtn">🔁 くりかえし</button>
       <div class="cv2-spacer"></div>
       <div class="cv2-inst">
-        <span class="lbl">のび</span>
+        <span class="lbl" title="音を鳴らしたあとの余韻。音符そのものの長さ（拍数）はSTEP2の「1音の長さ」で変えます">のび</span>
         <div class="tabs" id="ringTabs"></div>
       </div>
       <div class="cv2-inst">
